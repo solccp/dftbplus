@@ -33,13 +33,13 @@ Hamiltonian = DFTB {
   SlaterKosterFiles = {
     Fe-Fe = "./Fe-Fe.skf"
   }
-  OrbitalPotential = {
-   Functional = {pSIC}
-   Fe = {
-     Shells = {3} # d shell
-     UJ = 0.087105 # (U+W)/4
-   }
-  }
+#  OrbitalPotential = {
+#   Functional = {pSIC}
+#   Fe = {
+#     Shells = {3} # d shell
+#     UJ = 0.087105 # (U+W)/4
+#   }
+#  }
 }
 
 Options = {

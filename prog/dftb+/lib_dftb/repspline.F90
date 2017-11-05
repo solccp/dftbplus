@@ -36,6 +36,9 @@ module repspline
 
     !> Cutoff for the last spline
     real(dp) :: cutoff
+
+    !> Order of the spline function (default: cubic)
+    integer :: nOrder = 3               
   end type TRepSplineIn
 
 
@@ -63,6 +66,9 @@ module repspline
 
     !> Initialisation status
     logical :: tInit = .false.
+
+    !> Order of the spline
+    integer :: nOrder = 3               
   end type ORepSpline
 
 
@@ -108,8 +114,9 @@ contains
     @:ASSERT(inp%cutoff >= 0.0_dp)
 
     self%nSpline = size(inp%xStart)
+    self%nOrder = inp%nOrder
     allocate(self%xStart(self%nSpline))
-    allocate(self%spCoeffs(4, self%nSpline - 1))
+    allocate(self%spCoeffs(self%nOrder + 1, self%nSpline - 1))
     self%xStart(:) = inp%xStart(:)
     self%spCoeffs(:,:) = inp%spCoeffs(:,:)
     self%spLastCoeffs(:) = inp%spLastCoeffs(:)
@@ -165,18 +172,34 @@ contains
 
       xv = rr - self%xStart(imatch)
       xh = xv
-      if (imatch < self%nSpline) then
-        res = self%spCoeffs(1, imatch)
-        do ii = 2, 4
-          res = res + self%spCoeffs(ii, imatch) * xh
-          xh = xh * xv
-        end do
+      if (self%nOrder == 4) then
+        if (imatch < self%nSpline) then
+          res = self%spCoeffs(1, imatch)
+          do ii = 2, 5
+            res = res + self%spCoeffs(ii, imatch) * xh
+            xh = xh * xv
+          end do
+        else
+          res = self%spLastCoeffs(1)
+          do ii = 2, 5
+            res = res + self%spLastCoeffs(ii) * xh
+            xh = xh * xv
+          end do
+        end if      
       else
-        res = self%spLastCoeffs(1)
-        do ii = 2, 6
-          res = res + self%spLastCoeffs(ii) * xh
-          xh = xh * xv
-        end do
+        if (imatch < self%nSpline) then
+          res = self%spCoeffs(1, imatch)
+          do ii = 2, 4
+            res = res + self%spCoeffs(ii, imatch) * xh
+            xh = xh * xv
+          end do
+        else
+          res = self%spLastCoeffs(1)
+          do ii = 2, 6
+            res = res + self%spLastCoeffs(ii) * xh
+            xh = xh * xv
+          end do
+        end if
       end if
     end if
 
@@ -217,35 +240,69 @@ contains
       call bisection(imatch, self%xStart, rr)
       xv = rr - self%xStart(imatch)
       d1 = 0.0_dp
-      if (imatch < self%nSpline) then
-        xh = 1.0_dp
-        do ii = 2, 4
-          d1 = d1 + real(ii-1, dp) * self%spCoeffs(ii, imatch) * xh
-          xh = xh * xv
-        end do
-        if (present(d2)) then
+      if (self%nOrder == 4) then
+        if (imatch < self%nSpline) then
           xh = 1.0_dp
-          d2 = 0.0_dp
-          do ii = 3, 4
-            d2 = d2 + real(ii-2, dp) * real(ii-1, dp)&
-                & * self%spCoeffs(ii, imatch) * xh
+          do ii = 2, 5
+            d1 = d1 + real(ii-1, dp) * self%spCoeffs(ii, imatch) * xh
             xh = xh * xv
           end do
+          if (present(d2)) then
+            xh = 1.0_dp
+            d2 = 0.0_dp
+            do ii = 3, 5
+              d2 = d2 + real(ii-2, dp) * real(ii-1, dp)&
+                  & * self%spCoeffs(ii, imatch) * xh
+              xh = xh * xv
+            end do
+          end if
+        else
+          xh = 1.0_dp
+          do ii = 2, 5
+            d1 = d1 + real(ii-1, dp) * self%spLastCoeffs(ii) * xh
+            xh = xh * xv
+          end do
+          if (present(d2)) then
+            xh = 1.0_dp
+            d2 = 0.0_dp
+            do ii = 3, 5
+              d2 = d2 + real(ii-2, dp) * real(ii-1, dp) * xh&
+                  & * self%spLastCoeffs(ii)
+              xh = xh * xv
+            end do
+          end if
         end if
       else
-        xh = 1.0_dp
-        do ii = 2, 6
-          d1 = d1 + real(ii-1, dp) * self%spLastCoeffs(ii) * xh
-          xh = xh * xv
-        end do
-        if (present(d2)) then
+        if (imatch < self%nSpline) then
           xh = 1.0_dp
-          d2 = 0.0_dp
-          do ii = 3, 6
-            d2 = d2 + real(ii-2, dp) * real(ii-1, dp) * xh&
-                & * self%spLastCoeffs(ii)
+          do ii = 2, 4
+            d1 = d1 + real(ii-1, dp) * self%spCoeffs(ii, imatch) * xh
             xh = xh * xv
           end do
+          if (present(d2)) then
+            xh = 1.0_dp
+            d2 = 0.0_dp
+            do ii = 3, 4
+              d2 = d2 + real(ii-2, dp) * real(ii-1, dp)&
+                  & * self%spCoeffs(ii, imatch) * xh
+              xh = xh * xv
+            end do
+          end if
+        else
+          xh = 1.0_dp
+          do ii = 2, 6
+            d1 = d1 + real(ii-1, dp) * self%spLastCoeffs(ii) * xh
+            xh = xh * xv
+          end do
+          if (present(d2)) then
+            xh = 1.0_dp
+            d2 = 0.0_dp
+            do ii = 3, 6
+              d2 = d2 + real(ii-2, dp) * real(ii-1, dp) * xh&
+                  & * self%spLastCoeffs(ii)
+              xh = xh * xv
+            end do
+          end if
         end if
       end if
     end if
