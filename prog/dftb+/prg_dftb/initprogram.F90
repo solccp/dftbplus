@@ -1124,6 +1124,15 @@ contains
         hubbU = input%ctrl%hubbU
       end where
     end if
+    if (allocated(input%ctrl%orbEne)) then
+      do iSp = 1, nType
+        do jj = 1, 4
+          if (input%ctrl%orbEneRead(jj, iSp)) then
+            atomEigVal(jj, iSp) = input%ctrl%orbEne(jj, iSp)
+          end if
+        end do
+      end do
+    end if
     if (tSccCalc) then
       allocate(sccInp)
       allocate(sccCalc)
@@ -2512,6 +2521,24 @@ contains
             end if
             write(stdOut, "(A,T30,A2,2X,I1,'(',A1,'): ',E14.6)") trim(strTmp), speciesName(iSp),&
                 & jj, orbitalNames(orb%angShell(jj, iSp)+1), hubbU(jj, iSp)
+          end do
+        end do
+      end if
+      if (allocated(input%ctrl%orbEne)) then
+        strTmp = ""
+        tFirst = .true.
+        do iSp = 1, nType
+          do jj = 1, orb%nShell(iSp)
+            if (input%ctrl%orbEneRead(jj, iSp)) then
+              if (tFirst) then
+                write(strTmp, "(A,':')") "Non-default orbital energy"
+                tFirst = .false.
+              else
+                write(strTmp, "(A)") ""
+              end if
+              write(*, "(A,T30,A2,2X,I1,'(',A1,'): ',E14.6)") trim(strTmp), speciesName(iSp), jj, &
+                    & orbitalNames(orb%angShell(jj, iSp)+1), atomEigVal(jj, iSp)
+            end if
           end do
         end do
       end if

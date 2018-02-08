@@ -328,6 +328,7 @@ contains
 
     write(stdOut, '(2A,/,A)') vbar, repeat(hbar, headerWidth - 1), vbar
     write(stdOut, '(3A)') vbar, '  DFTB+ ', trim(release)
+    write(stdOut, '(3A)') vbar, '  Chien-Pin mod:', '20180208'
     write(stdOut, '(A)') vbar
     write(stdOut, '(2A,I0,A)') vbar, '  Copyright (C) ', year, '  DFTB+ developers group'
     write(stdOut, '(A,/,2A,/,A)') vbar, vbar, repeat(hbar, headerWidth - 1), vbar

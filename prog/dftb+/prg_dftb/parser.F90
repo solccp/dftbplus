@@ -2006,6 +2006,7 @@ contains
     end if
 
     call readCustomisedHubbards(node, geo, slako%orb, ctrl%tOrbResolved, ctrl%hubbU)
+    call readCustomisedOrbitalEnergies(node, geo, slako%orb, ctrl%orbEne, ctrl%orbEneRead)
 
   contains
 
@@ -3420,5 +3421,59 @@ contains
 
   end subroutine readBlacs
 
+!> Reads customised on-site orbital energy values.
+  !!
+  subroutine readCustomisedOrbitalEnergies(node, geo, orb, orbEne, orbEneRead)
+    type(fnode), pointer, intent(in) :: node
+    type(TGeometry), intent(in)  :: geo
+    type(TOrbitals), intent(in) :: orb
+    real(dp), allocatable, intent(out) :: orbEne(:,:)
+    logical, allocatable, intent(out) :: orbEneRead(:,:)
+    
+    type(fnode), pointer :: child, child2, child3
+    integer :: iSp1
+
+    call getChild(node, "CustomisedOrbitalEnergy", child, requested=.false.)
+    if (associated(child)) then
+      allocate(orbEne(orb%mShell, geo%nSpecies))
+      allocate(orbEneRead(orb%mShell, geo%nSpecies))
+      orbEneRead(:,:) = .false.
+      orbEne(:,:) = 0.0_dp
+      do iSp1 = 1, geo%nSpecies
+        call getChild(child, geo%speciesNames(iSp1), child2, requested=.false.)
+        if (.not. associated(child2)) then
+          cycle
+        end if
+        call getChild(child2, "s", child3, requested=.false.)
+        if (associated(child3)) then
+            call getChildValue(child3, "", orbEne(1, iSp1))
+            orbEneRead(1, iSp1) = .true.
+        end if
+
+        if (orb%mShell > 1) then
+            call getChild(child2, "p", child3, requested=.false.)
+            if (associated(child3)) then
+                call getChildValue(child3, "", orbEne(2, iSp1))
+                orbEneRead(2, iSp1) = .true.
+            end if
+        end if
+        if (orb%mShell > 2) then 
+            call getChild(child2, "d", child3, requested=.false.)
+            if (associated(child3)) then
+                call getChildValue(child3, "", orbEne(3, iSp1))
+                orbEneRead(3, iSp1) = .true.
+            end if
+        end if
+        if (orb%mShell > 3) then
+            call getChild(child2, "f", child3, requested=.false.)
+            if (associated(child3)) then
+                call getChildValue(child3, "", orbEne(4, iSp1))
+                orbEneRead(4, iSp1) = .true.
+            end if
+        end if
+      end do
+    end if
+
+  end subroutine readCustomisedOrbitalEnergies
 
 end module parser

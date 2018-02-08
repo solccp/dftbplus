@@ -280,6 +280,10 @@ module inputdata_module
     !> customised Hubbard U values
     real(dp), allocatable :: hubbU(:,:)
 
+    !> customised on-site orb energy values
+    real(dp), allocatable :: orbEne(:,:)   
+    logical , allocatable :: orbEneRead(:,:)
+
     !> spin-orbit constants
     real(dp), allocatable :: xi(:,:)
 
