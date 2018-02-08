@@ -28,6 +28,37 @@ module inputdata_module
   private
   save
 
+  public :: control, TGeometry, slater, inputData, XLBOMDInp, TParallelOpts
+  public :: TBlacsOpts
+  public :: init, destruct
+
+
+  !> Contains Blacs specific options.
+  type :: TBlacsOpts
+
+    !> Block size for matrix rows and columns.
+    integer :: blockSize
+
+  end type TBlacsOpts
+
+
+  !> Contains the parallel options
+  type :: TParallelOpts
+
+    !> Number of processor groups
+    integer :: nGroup
+
+    !> Blacs options
+    type(TBlacsOpts) :: blacsOpts
+
+  end type TParallelOpts
+
+
+  !> LBFGS input settings
+  type TLbfgsInput
+    integer :: memory
+  end type TLbfgsInput
+
 
   !> Main control data for program as extracted by the parser
   type control
@@ -48,7 +79,13 @@ module inputdata_module
     real(dp) :: sccTol      = 0.0_dp
 
     !> Read starting charges from disc
-    logical :: tReadChrg   = .false.
+    logical :: tReadChrg = .false.
+
+    !> Disc charges are stored as ascii or binary files
+    logical :: tReadChrgAscii = .true.
+
+    !> Disc charges should be written as ascii or binary files
+    logical :: tWriteChrgAscii = .true.
 
     !> should probably be packaged
     logical :: tGeoOpt     = .false.
@@ -315,6 +352,8 @@ module inputdata_module
     !> Ewald alpha
     real(dp) :: ewaldAlpha = 0.0_dp
 
+    !> Ewald tolerance
+    real(dp) :: tolEwald = 1.0E-9_dp
 
     !> Various options
     logical :: tWriteTagged = .false.
@@ -350,12 +389,21 @@ module inputdata_module
 
     type(linrespini) :: lrespini
 
-#:if WITH_SOCKETS
+    !> LBFGS input
+    type(TLbfgsInput), allocatable :: lbfgsInp
+
+
+  #:if WITH_SOCKETS
     !> socket communication
     type(IpiSocketCommInp), allocatable :: socketInput
-#:endif
-  end type control
+  #:endif
 
+    type(TParallelOpts), allocatable :: parallelOpts
+
+    !> Maximal timing level to show in output
+    integer :: timingLevel
+
+  end type control
 
   !> Atomistic geometry and boundary conditions of the system
   type geometry
@@ -404,9 +452,6 @@ module inputdata_module
   interface destruct
     module procedure InputData_destruct
   end interface destruct
-
-  public :: control, TGeometry, slater, inputData, XLBOMDInp
-  public :: init, destruct
 
 contains
 

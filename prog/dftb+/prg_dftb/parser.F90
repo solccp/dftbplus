@@ -9,10 +9,10 @@
 
 !> Fills the derived type with the input parameters from an HSD or an XML file.
 module parser
+  use globalenv
   use assert
   use accuracy
   use constants
-  use io
   use inputdata_module
   use typegeometryhsd
   use hsdparser, only : dumpHSD, dumpHSDAsXML, getNodeHSDName
@@ -43,7 +43,7 @@ module parser
 
   private
 
-  public :: parseHSDInput, parserVersion
+  public :: parseHsdInput, parserVersion
 
 
   ! Default file names
@@ -92,7 +92,7 @@ contains
 
 
   !> Parse input from an HSD/XML file
-  subroutine parseHSDInput(input)
+  subroutine parseHsdInput(input)
 
     !> Returns initialised input variables on exit
     type(inputData), intent(out) :: input
@@ -161,6 +161,8 @@ contains
     ! Read W values if needed by Hamitonian or excited state calculation
     call readSpinConstants(hamNode, input%geom, input%slako, input%ctrl)
 
+    call readParallel(root, input%ctrl%parallelOpts)
+
     ! input data strucutre has been initialised
     input%tInitialized = .true.
 
@@ -168,12 +170,12 @@ contains
     call warnUnprocessedNodes(root, parserFlags%tIgnoreUnprocessed)
 
     ! Dump processed tree in HSD and XML format
-    if (parserFlags%tWriteHSD) then
+    if (tIoProc .and. parserFlags%tWriteHSD) then
       call dumpHSD(hsdTree, hsdProcInputName)
       write(stdout, '(/,/,A)') "Processed input in HSD format written to '" &
           &// hsdProcInputName // "'"
     end if
-    if (parserFlags%tWriteXML) then
+    if (tIoProc .and. parserFlags%tWriteXML) then
       call dumpHSDAsXML(hsdTree, xmlProcInputName)
       write(stdout, '(A,/)') "Processed input in XML format written to '" &
           &// xmlProcInputName // "'"
@@ -186,7 +188,7 @@ contains
 
     call destroyNode(hsdTree)
 
-  end subroutine parseHSDInput
+  end subroutine parseHsdInput
 
 
   !> Read in parser options (options not passed to the main code)
@@ -283,7 +285,9 @@ contains
     type(fnode), pointer :: child, child2, child3, value, value2, field
 
     type(string) :: buffer, buffer2, modifier
+#:if WITH_SOCKETS
     character(lc) :: sTmp
+#:endif
 
     ctrl%tGeoOpt = .false.
     ctrl%tCoordOpt = .false.
@@ -462,6 +466,62 @@ contains
         end if
       end if
       ctrl%tGeoOpt = ctrl%tLatOpt .or. ctrl%tCoordOpt
+
+    case ("lbfgs")
+
+      ctrl%iGeoOpt = 4
+
+      ctrl%tForces = .true.
+      ctrl%restartFreq = 1
+      call getChildValue(node, "LatticeOpt", ctrl%tLatOpt, .false.)
+      if (ctrl%tLatOpt) then
+        call getChildValue(node, "Pressure", ctrl%pressure, 0.0_dp, &
+            & modifier=modifier, child=child)
+        call convertByMul(char(modifier), pressureUnits, child, &
+            & ctrl%pressure)
+        call getChildValue(node, "FixAngles", ctrl%tLatOptFixAng, .false.)
+        if (ctrl%tLatOptFixAng) then
+          call getChildValue(node, "FixLengths", ctrl%tLatOptFixLen, &
+              & (/.false.,.false.,.false./))
+        else
+          call getChildValue(node, "Isotropic", ctrl%tLatOptIsotropic, .false.)
+        end if
+        call getChildValue(node, "MaxLatticeStep", ctrl%maxLatDisp, 0.2_dp)
+      end if
+      call getChildValue(node, "MovedAtoms", buffer2, "1:-1", child=child, &
+          &multiple=.true.)
+      call convAtomRangeToInt(char(buffer2), geom%speciesNames, geom%species, &
+          &child, ctrl%indMovedAtom)
+
+      ctrl%nrMoved = size(ctrl%indMovedAtom)
+      ctrl%tCoordOpt = (ctrl%nrMoved /= 0)
+      if (ctrl%tCoordOpt) then
+        call getChildValue(node, "MaxAtomStep", ctrl%maxAtomDisp, 0.2_dp)
+      end if
+      call getChildValue(node, "MaxForceComponent", ctrl%maxForce, 1e-4_dp, &
+          &modifier=modifier, child=field)
+      call convertByMul(char(modifier), forceUnits, field, ctrl%maxForce)
+      call getChildValue(node, "MaxSteps", ctrl%maxRun, 200)
+      call getChildValue(node, "OutputPrefix", buffer2, "geo_end")
+      ctrl%outFile = unquote(char(buffer2))
+      call getChildValue(node, "AppendGeometries", ctrl%tAppendGeo, .false.)
+      call getChildValue(node, "ConvergentForcesOnly", ctrl%tConvrgForces, &
+          & .true.)
+      call readGeoConstraints(node, ctrl, geom%nAtom)
+      if (ctrl%tLatOpt) then
+        if (ctrl%nrConstr/=0) then
+          call error("Lattice optimisation and constraints currently&
+              & incompatible.")
+        end if
+        if (ctrl%nrMoved/=0.and.ctrl%nrMoved<geom%nAtom) then
+          call error("Subset of optimising atoms not currently possible with&
+              & lattice optimisation.")
+        end if
+      end if
+      ctrl%tGeoOpt = ctrl%tLatOpt .or. ctrl%tCoordOpt
+
+      allocate(ctrl%lbfgsInp)
+      call getChildValue(node, "Memory", ctrl%lbfgsInp%memory, 20)
 
     case("secondderivatives")
       ! currently only numerical derivatives of forces is implemented
@@ -1358,6 +1418,7 @@ contains
 
       if (geo%tPeriodic) then
         call getChildValue(node, "EwaldParameter", ctrl%ewaldAlpha, 0.0_dp)
+        call getChildValue(node, "EwaldTolerance", ctrl%tolEwald, 1.0e-9_dp)
       end if
 
       ! spin
@@ -1703,15 +1764,6 @@ contains
         end if
         deallocate(tmpI1)
         deallocate(kpts)
-        if (ctrl%tSCC .and. ctrl%maxIter /= 1) then
-          write(errorStr, "(A,I3)") "SCC cycle with k-lines probably will&
-              & not converge, SCC iterations set to:", ctrl%maxIter
-          call warning(errorStr)
-        end if
-        if (ctrl%tSCC .and. .not.ctrl%tReadChrg) then
-          call warning("It is strongly suggested you use the&
-              & ReadInitialCharges option.")
-        end if
 
       case (textNodeName)
 
@@ -1755,6 +1807,15 @@ contains
         ii = 100
       end if
       call getChildValue(node, "MaxSCCIterations", ctrl%maxIter, ii)
+    end if
+
+    if (tBadIntegratingKPoints .and. ctrl%tSCC .and. ctrl%maxIter /= 1) then
+      write(errorStr, "(A,I3)") "SCC cycle with these k-points probably will&
+          & not correctly calculate many properties, SCC iterations set to:", ctrl%maxIter
+      call warning(errorStr)
+    end if
+    if (tBadIntegratingKPoints .and. ctrl%tSCC .and. .not.ctrl%tReadChrg) then
+      call warning("It is strongly suggested you use the ReadInitialCharges option.")
     end if
 
     call getChild(node, "OrbitalPotential", child, requested=.false.)
@@ -2594,8 +2655,22 @@ contains
     end if
     call getChildValue(node, "WriteHS", ctrl%tWriteHS, .false.)
     call getChildValue(node, "WriteRealHS", ctrl%tWriteRealHS, .false.)
-    call getChildValue(node, "MinimiseMemoryUsage", ctrl%tMinMemory, .false.)
+    call getChildValue(node, "MinimiseMemoryUsage", ctrl%tMinMemory, .false., child=child)
+    if (ctrl%tMinMemory) then
+      call detailedWarning(child, "Memory minimisation is not working currently, normal calculation&
+          & will be used instead")
+    end if
     call getChildValue(node, "ShowFoldedCoords", ctrl%tShowFoldedCoord, .false.)
+  #:if DEBUG > 0
+    call getChildValue(node, "TimingVerbosity", ctrl%timingLevel, -1)
+  #:else
+    call getChildValue(node, "TimingVerbosity", ctrl%timingLevel, 0)
+  #:endif
+
+    if (ctrl%tReadChrg) then
+      call getChildValue(node, "ReadChargesAsText", ctrl%tReadChrgAscii, .false.)
+    end if
+    call getChildValue(node, "WriteChargesAsText", ctrl%tWriteChrgAscii, .false.)
 
   end subroutine readOptions
 
@@ -2984,9 +3059,12 @@ contains
     !> Control structure to fill
     type(control), intent(inout) :: ctrl
 
-    type(fnode), pointer :: child, child2
+    type(fnode), pointer :: child
+  #:if WITH_ARPACK
+    type(fnode), pointer :: child2
     type(string) :: buffer
     type(string) :: modifier
+  #:endif
 
     ! Linear response stuff
     call getChild(node, "Casida", child, requested=.false.)
@@ -3287,5 +3365,60 @@ contains
     end if
 
   end subroutine readCustomisedHubbards
+
+
+  !> Reads the parallel block.
+  subroutine readParallel(root, parallelOpts)
+
+    !> Root node eventually containing the current block
+    type(fnode), pointer, intent(in) :: root
+
+    !> Parallel settings
+    type(TParallelOpts), allocatable, intent(out) :: parallelOpts
+
+    type(fnode), pointer :: node
+
+    call getChild(root, "Parallel", child=node, requested=.false.)
+    if (withMpi .and. .not. associated(node)) then
+      call setChild(root, "Parallel", node)
+    end if
+    if (associated(node)) then
+      if (.not. withMpi) then
+        call detailedWarning(node, "Settings will be read but ignored (compiled without MPI&
+            & support)")
+      end if
+      allocate(parallelOpts)
+      call getChildValue(node, "Groups", parallelOpts%nGroup, 1)
+      call readBlacs(node, parallelOpts%blacsOpts)
+    end if
+
+  end subroutine readParallel
+
+
+  !> Reads the blacs block.
+  subroutine readBlacs(root, blacsOpts)
+
+    !> Root node eventually containing the current block
+    type(fnode), pointer, intent(in) :: root
+
+    !> Blacs settings
+    type(TBlacsOpts), intent(inout) :: blacsOpts
+
+    type(fnode), pointer :: node
+
+    call getChild(root, "Blacs", child=node, requested=.false.)
+    if (withScalapack .and. .not. associated(node)) then
+      call setChild(root, "Blacs", node)
+    end if
+    if (associated(node)) then
+      if (.not. withScalapack) then
+        call detailedWarning(node, "Settings will be read but ignored (compiled without SCALAPACK&
+            & support)")
+      end if
+      call getChildValue(node, "BlockSize", blacsOpts%blockSize, 32)
+    end if
+
+  end subroutine readBlacs
+
 
 end module parser
