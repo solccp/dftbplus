@@ -1,6 +1,6 @@
 !--------------------------------------------------------------------------------------------------!
 !  DFTB+: general package for performing fast atomistic simulations                                !
-!  Copyright (C) 2017  DFTB+ developers group                                                      !
+!  Copyright (C) 2018  DFTB+ developers group                                                      !
 !                                                                                                  !
 !  See the LICENSE file for terms of usage and distribution.                                       !
 !--------------------------------------------------------------------------------------------------!
@@ -9,6 +9,7 @@
 
 !> Global variables and initialization for the main program.
 module initprogram
+  use omp_lib
   use mainio, only : initOutputFile
   use assert
   use globalenv
@@ -72,6 +73,7 @@ module initprogram
   use mainio, only : receiveGeometryFromSocket
   use ipisocket
 #:endif
+  use elstatpot
   use pmlocalisation
   use energies
   use potentials
@@ -112,9 +114,6 @@ module initprogram
 
   !> SCC module internal variables
   type(TScc), allocatable :: sccCalc
-
-  !> Nr. of different cutoffs
-  integer, parameter :: nCutoff = 1
 
   !> nr. of atoms
   integer :: nAtom
@@ -234,7 +233,6 @@ module initprogram
   !> list of atomic masses for each species
   real(dp), allocatable :: speciesMass(:)
 
-
   !> Raw H^0 hamiltonian data
   type(OSlakoCont) :: skHamCont
 
@@ -250,10 +248,8 @@ module initprogram
   !> Cut off distance for repulsive interactions
   real(dp) :: skRepCutoff
 
-
   !> longest pair interaction
   real(dp) :: mCutoff
-
 
   !> Sparse hamiltonian matrix
   real(dp), allocatable :: ham(:,:)
@@ -406,6 +402,9 @@ module initprogram
 
   !> Do we need Mulliken charges?
   logical :: tMulliken
+
+  !> Electrostatic potentials if requested
+  type(TElStatPotentials), allocatable :: esp
 
   !> Calculate localised orbitals?
   logical :: tLocalise
@@ -1164,6 +1163,9 @@ contains
         sccInp%extCharges = input%ctrl%extChrg
         if (allocated(input%ctrl%extChrgBlurWidth)) then
           sccInp%blurWidths = input%ctrl%extChrgblurWidth
+          if (any(sccInp%blurWidths < 0.0_dp)) then
+            call error("Gaussian blur widths for charges may not be negative")
+          end if
         end if
       end if
       if (allocated(input%ctrl%chrgConstr)) then
@@ -1620,6 +1622,14 @@ contains
       tDipole = .false.
     end if
 
+    if (allocated(input%ctrl%elStatPotentialsInp)) then
+      if (.not.tSccCalc) then
+        call error("Electrostatic potentials only available for SCC calculations")
+      end if
+      allocate(esp)
+      call TElStatPotentials_init(esp, input%ctrl%elStatPotentialsInp, tEField .or. tExtChrg)
+    end if
+
     tLocalise = input%ctrl%tLocalise
     if (tLocalise .and. (nSpin > 2 .or. t2Component)) then
       call error("Localisation of electronic states currently unsupported for&
@@ -2071,8 +2081,8 @@ contains
     tWriteResultsTag = env%tGlobalMaster .and. input%ctrl%tWriteResultsTag
     tWriteDetailedOut = env%tGlobalMaster .and. input%ctrl%tWriteDetailedOut
     tWriteBandDat = env%tGlobalMaster .and. input%ctrl%tWriteBandDat
-    tWriteHS = env%tGlobalMaster .and. input%ctrl%tWriteHS
-    tWriteRealHS = env%tGlobalMaster .and. input%ctrl%tWriteRealHS
+    tWriteHS = input%ctrl%tWriteHS
+    tWriteRealHS = input%ctrl%tWriteRealHS
 
     ! Check if stopfiles already exist and quit if yes
     inquire(file=fStopSCC, exist=tExist)
@@ -2089,7 +2099,7 @@ contains
     if (env%tGlobalMaster) then
       call initOutputFiles(env, tWriteAutotest, tWriteResultsTag, tWriteBandDat, tDerivs,&
           & tWriteDetailedOut, tMd, tGeoOpt, geoOutFile, fdAutotest, fdResultsTag, fdBand,&
-          & fdEigvec, fdHessian, fdDetailedOut, fdMd, fdCharges)
+          & fdEigvec, fdHessian, fdDetailedOut, fdMd, fdCharges, esp)
     end if
 
     call getDenseDescCommon(orb, nAtom, t2Component, denseDesc)
@@ -2210,19 +2220,31 @@ contains
 
   #:if WITH_MPI
     if (env%mpi%nGroup > 1) then
-      write(stdOut, "('MPI processors: ',T30,I0,' split into ',I0,' groups')")&
+      write(stdOut, "('MPI processes: ',T30,I0,' (split into ',I0,' groups)')")&
           & env%mpi%globalComm%size, env%mpi%nGroup
     else
-      write(stdOut, "('MPI processors:',T30,I0)") env%mpi%globalComm%size
+      write(stdOut, "('MPI processes:',T30,I0)") env%mpi%globalComm%size
     end if
   #:endif
 
+    write(stdOut, "('OpenMP threads: ', T30, I0)") omp_get_max_threads()
+
+  #:if WITH_MPI
+    if (omp_get_max_threads() > 1 .and. .not. input%ctrl%parallelOpts%tOmpThreads) then
+      write(stdOut, *)
+      call error("You must explicitely enable OpenMP threads (UseOmpThreads = Yes) if you&
+          & wish to run an MPI-parallelised binary with OpenMP threads. If not, make sure that&
+          & the environment variable OMP_NUM_THREADS is set to 1.")
+      write(stdOut, *)
+    end if
+  #:endif
+    
   #:if WITH_SCALAPACK
     write(stdOut, "('BLACS orbital grid size:', T30, I0, ' x ', I0)") &
         & env%blacs%orbitalGrid%nRow, env%blacs%orbitalGrid%nCol
     write(stdOut, "('BLACS atom grid size:', T30, I0, ' x ', I0)") &
         & env%blacs%atomGrid%nRow, env%blacs%atomGrid%nCol
-  #:endif  
+  #:endif
 
     if (tRandomSeed) then
       write(stdOut, "(A,':',T30,I14)") "Chosen random seed", iSeed
@@ -2815,8 +2837,8 @@ contains
 
   !> Initialises (clears) output files.
   subroutine initOutputFiles(env, tWriteAutotest, tWriteResultsTag, tWriteBandDat, tDerivs,&
-      & tWriteDetailedOut, tMd, tGeoOpt, geoOutFile, fdAutotest, fdResultsTag, fdBand,&
-      & fdEigvec, fdHessian, fdDetailedOut, fdMd, fdChargeBin)
+      & tWriteDetailedOut, tMd, tGeoOpt, geoOutFile, fdAutotest, fdResultsTag, fdBand, fdEigvec,&
+      & fdHessian, fdDetailedOut, fdMd, fdChargeBin, esp)
 
     !> Environment
     type(TEnvironment), intent(inout) :: env
@@ -2869,6 +2891,9 @@ contains
     !> File descriptor for charge restart file
     integer, intent(out) :: fdChargeBin
 
+    !> Electrostatic potentials if requested
+    type(TElStatPotentials), allocatable, intent(inout) :: esp
+
     call initTaggedWriter()
     if (tWriteAutotest) then
       call initOutputFile(autotestTag, fdAutotest)
@@ -2896,6 +2921,9 @@ contains
       call clearFile(trim(geoOutFile) // ".xyz")
     end if
     fdChargeBin = getFileId()
+    if (allocated(esp)) then
+      call initOutputFile(esp%espOutFile, esp%fdEsp)
+    end if
 
   end subroutine initOutputFiles
 

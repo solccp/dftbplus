@@ -1,6 +1,6 @@
 !--------------------------------------------------------------------------------------------------!
 !  DFTB+: general package for performing fast atomistic simulations                                !
-!  Copyright (C) 2017  DFTB+ developers group                                                      !
+!  Copyright (C) 2018  DFTB+ developers group                                                      !
 !                                                                                                  !
 !  See the LICENSE file for terms of usage and distribution.                                       !
 !--------------------------------------------------------------------------------------------------!
@@ -152,7 +152,6 @@ contains
     real(dp) :: totalCpu, totalWall, cpuTime, wallTime, allCpu, allWall
     integer :: iTimer, level, maxLevel
     character :: operation
-    character(100) :: formatStr
     character(:), allocatable :: prefix
 
     if (this%maxLevel < 0) then
