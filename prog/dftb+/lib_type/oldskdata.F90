@@ -237,11 +237,11 @@ contains
     read(fp, *, iostat=iostat) (repsplinein%expcoeffs(ii), ii = 1, 3)
     call checkioerror(iostat, fname, "Error in reading exponential coeffs")
     allocate(repsplinein%xstart(nint))
-    allocate(repsplinein%spcoeffs(5, nint - 1))
     allocate(xend(nint))
 
 
     if (has4orderspline) then
+      allocate(repsplinein%spcoeffs(5, nint - 1))
       do jj = 1, nint - 1
         read(fp, *, iostat=iostat) repsplinein%xstart(jj), xend(jj),&
             & (repsplinein%spcoeffs(ii,jj), ii = 1, 5)
@@ -251,7 +251,9 @@ contains
           & (repsplinein%spLastCoeffs(ii), ii = 1, 5)
       call checkioerror(iostat, fname, "Error in reading last spline coeffs")
       repsplinein%nOrder = 4
+      repsplinein%spLastCoeffs(6) = 0.0_dp
     else
+      allocate(repsplinein%spcoeffs(4, nint - 1))
       do jj = 1, nint - 1
         read(fp, *, iostat=iostat) repsplinein%xstart(jj), xend(jj),&
             & (repsplinein%spcoeffs(ii,jj), ii = 1, 4)
