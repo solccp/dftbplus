@@ -206,6 +206,7 @@ contains
     integer :: nint, ii, jj
     character(lc) :: chdummy
     logical :: hasspline
+    logical :: has4orderspline
     real(dp), allocatable :: xend(:)
 
     ! Look for spline
@@ -214,8 +215,13 @@ contains
       if (iostat /= 0) then
         hasspline = .false.
         exit
+      elseif (chdummy == "Spline4") then
+        hasspline = .true.
+        has4orderspline = .true.
+        exit
       elseif (chdummy == "Spline") then
         hasspline = .true.
+        has4orderspline = .false.
         exit
       end if
     end do
@@ -231,17 +237,31 @@ contains
     read(fp, *, iostat=iostat) (repsplinein%expcoeffs(ii), ii = 1, 3)
     call checkioerror(iostat, fname, "Error in reading exponential coeffs")
     allocate(repsplinein%xstart(nint))
-    allocate(repsplinein%spcoeffs(4, nint - 1))
+    allocate(repsplinein%spcoeffs(5, nint - 1))
     allocate(xend(nint))
 
-    do jj = 1, nint - 1
-      read(fp, *, iostat=iostat) repsplinein%xstart(jj), xend(jj),&
-          & (repsplinein%spcoeffs(ii,jj), ii = 1, 4)
-      call checkioerror(iostat, fname, "Error in reading spline coeffs")
-    end do
-    read(fp, *, iostat=iostat) repsplinein%xstart(nint), xend(nint),&
-        & (repsplinein%spLastCoeffs(ii), ii = 1, 6)
-    call checkioerror(iostat, fname, "Error in reading last spline coeffs")
+
+    if (has4orderspline) then
+      do jj = 1, nint - 1
+        read(fp, *, iostat=iostat) repsplinein%xstart(jj), xend(jj),&
+            & (repsplinein%spcoeffs(ii,jj), ii = 1, 5)
+        call checkioerror(iostat, fname, "Error in reading spline coeffs")
+      end do
+      read(fp, *, iostat=iostat) repsplinein%xstart(nint), xend(nint),&
+          & (repsplinein%spLastCoeffs(ii), ii = 1, 5)
+      call checkioerror(iostat, fname, "Error in reading last spline coeffs")
+      repsplinein%nOrder = 4
+    else
+      do jj = 1, nint - 1
+        read(fp, *, iostat=iostat) repsplinein%xstart(jj), xend(jj),&
+            & (repsplinein%spcoeffs(ii,jj), ii = 1, 4)
+        call checkioerror(iostat, fname, "Error in reading spline coeffs")
+      end do
+      read(fp, *, iostat=iostat) repsplinein%xstart(nint), xend(nint),&
+          & (repsplinein%spLastCoeffs(ii), ii = 1, 6)
+      call checkioerror(iostat, fname, "Error in reading last spline coeffs")
+    end if
+
     repsplinein%cutoff = xend(nint)
     ! Check on consistenty
     do jj = 2, nint
