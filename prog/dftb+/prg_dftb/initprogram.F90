@@ -738,6 +738,9 @@ module initprogram
   !> Energy derivative with respect to atomic positions
   real(dp), allocatable :: derivs(:,:)
 
+  !> Repulsive energy derivative with respect to atomic positions
+  real(dp), allocatable :: repDerivs(:,:)
+
   !> Forces on any external charges
   real(dp), allocatable :: chrgForces(:,:)
 
@@ -2113,7 +2116,7 @@ contains
     call initArrays(env, tForces, tExtChrg, tLinResp, tLinRespZVect, tMd, tMulliken, tSpinOrbit,&
         & tImHam, tWriteRealHS, tWriteHS, t2Component, tRealHS, tPrintExcitedEigvecs, tDipole, orb,&
         & nAtom, nMovedAtom, nKPoint, nSpin, nExtChrg, indMovedAtom, mass, denseDesc, rhoPrim, h0,&
-        & iRhoPrim, excitedDerivs, ERhoPrim, derivs, chrgForces, energy, potential, TS, E0, Eband,&
+        & iRhoPrim, excitedDerivs, ERhoPrim, derivs, repDerivs, chrgForces, energy, potential, TS, E0, Eband,&
         & eigen, filling, coord0Fold, newCoords, orbitalL, HSqrCplx, SSqrCplx, eigvecsCplx,&
         & HSqrReal, SSqrReal, eigvecsReal, rhoSqrReal, chargePerShell, occNatural, velocities,&
         & movedVelo, movedAccel, movedMass, dipoleMoment)
@@ -2932,7 +2935,8 @@ contains
   subroutine initArrays(env, tForces, tExtChrg, tLinResp, tLinRespZVect, tMd, tMulliken,&
       & tSpinOrbit, tImHam, tWriteRealHS, tWriteHS, t2Component, tRealHS, tPrintExcitedEigvecs,&
       & tDipole, orb, nAtom, nMovedAtom, nKPoint, nSpin, nExtChrg, indMovedAtom, mass, denseDesc,&
-      & rhoPrim, h0, iRhoPrim, excitedDerivs, ERhoPrim, derivs, chrgForces, energy, potential, TS,&
+      & rhoPrim, h0, iRhoPrim, excitedDerivs, ERhoPrim, derivs, repDerivs, chrgForces,&
+      & energy, potential, TS,&
       & E0, Eband, eigen, filling, coord0Fold, newCoords, orbitalL, HSqrCplx, SSqrCplx,&
       & eigvecsCplx, HSqrReal, SSqrReal, eigvecsReal, rhoSqrReal, chargePerShell, occNatural,&
       & velocities, movedVelo, movedAccel, movedMass, dipoleMoment)
@@ -3027,6 +3031,9 @@ contains
     !> Derivatives of total energy with respect to atomic coordinates
     real(dp), intent(out), allocatable :: derivs(:,:)
 
+    !> Repulsive derivatives of total energy with respect to atomic coordinates
+    real(dp), intent(out), allocatable :: repDerivs(:,:)
+
     !> Forces on (any) external charges
     real(dp), intent(out), allocatable :: chrgForces(:,:)
 
@@ -3115,6 +3122,7 @@ contains
     if (tForces) then
       allocate(ERhoPrim(0))
       allocate(derivs(3, nAtom))
+      allocate(repDerivs(3, nAtom))
       if (tExtChrg) then
         allocate(chrgForces(3, nExtChrg))
       end if

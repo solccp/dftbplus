@@ -70,6 +70,7 @@ module mainio
   public :: printGeoStepInfo, printSccHeader, printSccInfo, printEnergies, printVolume
   public :: printPressureAndFreeEnergy, printMaxForce, printMaxLatticeForce
   public :: printMdInfo
+  public :: writeAdditionalAutotestTag
 #:if WITH_SOCKETS
   public :: receiveGeometryFromSocket
 #:endif
@@ -2013,6 +2014,51 @@ contains
 
   end subroutine writeAutotestTag
 
+  !> Write additional tagged output of data from the code at the end of the DFTB+ run,
+  !> data being then used for parameterization
+  subroutine writeAdditionalAutotestTag(fd, fileName, tPeriodic, totalEnergy, repEnergy, repDerivs,&
+      & tStress, repStress)
+
+    !> File ID to write to
+    integer, intent(in) :: fd
+
+    !> Name of output file
+    character(*), intent(in) :: fileName
+
+    !> Is the geometry periodic
+    logical, intent(in) :: tPeriodic
+
+    !> Total energy (elec + disp + rep)
+    real(dp), intent(in) :: totalEnergy
+
+    !> Repulsive energy
+    real(dp), intent(in) :: repEnergy
+
+    !> repulsive derivatives (allocation status used as a flag)
+    real(dp), allocatable, intent(in) :: repDerivs(:,:)
+
+    !> Should stresses be printed (only if periodic)
+    logical, intent(in) :: tStress
+
+    !> Repulsive stress tensor
+    real(dp), intent(in) :: repStress(:,:)
+
+    open(fd, file=fileName, action="write", status="old", position="append")
+    
+    call writeTagged(fd, tag_egyTotal, totalEnergy)
+    call writeTagged(fd, tag_egyRep, repEnergy)
+
+    if (allocated(repDerivs)) then
+      call writeTagged(fd, tag_forceRep, repDerivs)
+    end if
+
+    if (tPeriodic) then
+      if (tStress) then
+        call writeTagged(fd, tag_stressRep, repStress)
+      end if
+    end if
+    close(fd)
+  end subroutine writeAdditionalAutotestTag
 
   !> Writes out machine readable data
   subroutine writeResultsTag(fd, fileName, derivs, chrgForces, tStress, totalStress,&

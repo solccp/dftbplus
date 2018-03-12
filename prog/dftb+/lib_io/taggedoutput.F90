@@ -89,6 +89,22 @@ module taggedoutput
   !> External electric field
   character(*), parameter, public :: tag_externfield = 'external_efield'
 
+  !> Repulsive forces
+  character(*), parameter, public :: tag_forceRep   = 'repulsive_forces'
+
+  !> Repulsive energy
+  character(*), parameter, public :: tag_egyRep     = 'repulsive_energy'
+
+  !> Total energy
+  character(*), parameter, public :: tag_egyTotal   = 'total_energy'
+
+  !> Repulsive stress
+  character(*), parameter, public :: tag_stressRep  = 'repulsive_stress'
+
+  !> Kinetic stress
+  character(*), parameter, public :: tag_stressKE   = 'kinetic_stress'
+
+
   ! general format strings
 
   !> real string format

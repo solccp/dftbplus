@@ -100,6 +100,9 @@ contains
     !> Sign convention: Positive diagonal elements expand the supercell
     real(dp) :: totalStress(3,3)
 
+    !> Repulsive and kinetic part of the stress tensor, used for parameterization
+    real(dp) :: repStress(3,3)
+    
     !> Derivative of total energy with respect to lattice vectors
     !> Sign convention: This is in the uphill energy direction for the lattice vectors (each row
     !> pertaining to a separate lattice vector), i.e. opposite to the force.
@@ -406,7 +409,7 @@ contains
         call env%globalTimer%stopTimer(globalTimers%energyDensityMatrix)
         call getGradients(env, sccCalc, tEField, tXlbomd, nonSccDeriv, Efield, rhoPrim, ERhoPrim,&
             & qOutput, q0, skHamCont, skOverCont, pRepCont, neighborList, nNeighbor, species,&
-            & img2CentCell, iSparseStart, orb, potential, coord, derivs, iRhoPrim, thirdOrd,&
+            & img2CentCell, iSparseStart, orb, potential, coord, derivs, repDerivs, iRhoPrim, thirdOrd,&
             & chrgForces, dispersion)
         if (tLinResp) then
           derivs(:,:) = derivs + excitedDerivs
@@ -418,7 +421,7 @@ contains
           call getStress(env, sccCalc, tEField, nonSccDeriv, EField, rhoPrim, ERhoPrim, qOutput,&
               & q0, skHamCont, skOverCont, pRepCont, neighborList, nNeighbor, species,&
               & img2CentCell, iSparseStart, orb, potential, coord, latVec, invLatVec, cellVol,&
-              & coord0, totalStress, totalLatDeriv, intPressure, iRhoPrim, dispersion)
+              & coord0, totalStress, repStress, totalLatDeriv, intPressure, iRhoPrim, dispersion)
           call env%globalTimer%stopTimer(globalTimers%stressCalc)
           call printVolume(cellVol)
           ! MD case includes the atomic kinetic energy contribution, so print that later
@@ -633,6 +636,8 @@ contains
       call writeAutotestTag(fdAutotest, autotestTag, tPeriodic, cellVol, tMulliken, qOutput,&
           & derivs, chrgForces, excitedDerivs, tStress, totalStress, pDynMatrix,&
           & energy%EMermin, extPressure, energy%EGibbs, coord0, tLocalise, localisation, esp)
+      call writeAdditionalAutotestTag(fdAutotest, autotestTag, tPeriodic,&
+          & energy%Etotal, energy%Erep, repDerivs, tStress, repStress)
     end if
     if (tWriteResultsTag) then
       call writeResultsTag(fdResultsTag, resultsTag, derivs, chrgForces, tStress, totalStress,&
@@ -3858,7 +3863,7 @@ contains
   !> Calculates the gradients
   subroutine getGradients(env, sccCalc, tEField, tXlbomd, nonSccDeriv, Efield, rhoPrim, ERhoPrim,&
       & qOutput, q0, skHamCont, skOverCont, pRepCont, neighborList, nNeighbor, species,&
-      & img2CentCell, iSparseStart, orb, potential, coord, derivs, iRhoPrim, thirdOrd, chrgForces,&
+      & img2CentCell, iSparseStart, orb, potential, coord, derivs, repDerivs, iRhoPrim, thirdOrd, chrgForces,&
       & dispersion)
 
     !> Environment settings
@@ -3927,6 +3932,9 @@ contains
     !> derivatives of energy wrt to atomic positions
     real(dp), intent(out) :: derivs(:,:)
 
+    !> Repulsive derivatives of energy wrt to atomic positions
+    real(dp), intent(out) :: repDerivs(:,:)
+
     !> imaginary part of density matrix
     real(dp), intent(in), allocatable :: iRhoPrim(:,:)
 
@@ -3939,7 +3947,6 @@ contains
     !> dispersion interactions
     class(DispersionIface), intent(inout), allocatable :: dispersion
 
-    real(dp), allocatable :: tmpDerivs(:,:)
     logical :: tImHam, tExtChrg, tSccCalc
     integer :: nAtom
     integer :: ii
@@ -4010,10 +4017,9 @@ contains
       call dispersion%addGradients(derivs)
     end if
 
-    allocate(tmpDerivs(3, nAtom))
-    call getERepDeriv(tmpDerivs, coord, nNeighbor, neighborList%iNeighbor, species, pRepCont,&
+    call getERepDeriv(repDerivs, coord, nNeighbor, neighborList%iNeighbor, species, pRepCont,&
         & img2CentCell)
-    derivs(:,:) = derivs + tmpDerivs
+    derivs(:,:) = derivs + repDerivs
 
   end subroutine getGradients
 
@@ -4022,7 +4028,7 @@ contains
   subroutine getStress(env, sccCalc, tEField, nonSccDeriv, EField, rhoPrim, ERhoPrim, qOutput,&
       & q0, skHamCont, skOverCont, pRepCont, neighborList, nNeighbor, species, img2CentCell,&
       & iSparseStart, orb, potential, coord, latVec, invLatVec, cellVol, coord0, totalStress,&
-      & totalLatDeriv, intPressure, iRhoPrim, dispersion)
+      & repStress, totalLatDeriv, intPressure, iRhoPrim, dispersion)
 
     !> Environment settings
     type(TEnvironment), intent(in) :: env
@@ -4098,6 +4104,10 @@ contains
 
     !> stress tensor
     real(dp), intent(out) :: totalStress(:,:)
+    
+    !> repulsive stress tensor
+    real(dp), intent(out) :: repStress(:,:)
+    
 
     !> energy derivatives with respect to lattice vectors
     real(dp), intent(out) :: totalLatDeriv(:,:)
@@ -4149,9 +4159,9 @@ contains
       totalStress(:,:) = totalStress + tmpStress
     end if
 
-    call getRepulsiveStress(tmpStress, coord, nNeighbor, neighborList%iNeighbor, species,&
+    call getRepulsiveStress(repStress, coord, nNeighbor, neighborList%iNeighbor, species,&
         & img2CentCell, pRepCont, cellVol)
-    totalStress(:,:) = totalStress + tmpStress
+    totalStress(:,:) = totalStress + repStress
 
     intPressure = (totalStress(1,1) + totalStress(2,2) + totalStress(3,3)) / 3.0_dp
     totalLatDeriv(:,:) = -cellVol * matmul(totalStress, invLatVec)
