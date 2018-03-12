@@ -327,7 +327,7 @@ contains
     integer, parameter :: headerWidth = 80
 
     write(stdOut, '(2A,/,A)') vbar, repeat(hbar, headerWidth - 1), vbar
-    write(stdOut, '(3A)') vbar, '  DFTB+ Paramerization version by Chien-Pin Chou: ', '20180312'
+    write(stdOut, '(3A)') vbar, '  DFTB+ paramerization version by Chien-Pin Chou: ', '20180312'
     write(stdOut, '(3A)') vbar, '  DFTB+ ', trim(release)
     write(stdOut, '(A)') vbar
     write(stdOut, '(2A,I0,A)') vbar, '  Copyright (C) ', year, '  DFTB+ developers group'
