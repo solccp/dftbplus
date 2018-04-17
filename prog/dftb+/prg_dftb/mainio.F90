@@ -1981,11 +1981,11 @@ contains
 
   !> Write additional tagged output of data from the code at the end of the DFTB+ run,
   !> data being then used for parameterization
-  subroutine writeAdditionalAutotestTag(fd, fileName, tPeriodic, totalEnergy, repEnergy, repDerivs,&
+  subroutine writeAdditionalAutotestTag(fileName, tPeriodic, totalEnergy, repEnergy, repDerivs,&
       & tStress, repStress)
 
     !> File ID to write to
-    integer, intent(in) :: fd
+    integer :: fdAutotest
 
     !> Name of output file
     character(*), intent(in) :: fileName
@@ -2008,21 +2008,21 @@ contains
     !> Repulsive stress tensor
     real(dp), intent(in) :: repStress(:,:)
 
-    open(fd, file=fileName, action="write", status="old", position="append")
+    open(newUnit=fdAutotest, file=fileName, action="write", status="old", position="append")
     
-    call writeTagged(fd, tag_egyTotal, totalEnergy)
-    call writeTagged(fd, tag_egyRep, repEnergy)
+    call writeTagged(fdAutotest, tag_egyTotal, totalEnergy)
+    call writeTagged(fdAutotest, tag_egyRep, repEnergy)
 
     if (allocated(repDerivs)) then
-      call writeTagged(fd, tag_forceRep, repDerivs)
+      call writeTagged(fdAutotest, tag_forceRep, repDerivs)
     end if
 
     if (tPeriodic) then
       if (tStress) then
-        call writeTagged(fd, tag_stressRep, repStress)
+        call writeTagged(fdAutotest, tag_stressRep, repStress)
       end if
     end if
-    close(fd)
+    close(fdAutotest)
   end subroutine writeAdditionalAutotestTag
 
   !> Writes out machine readable data

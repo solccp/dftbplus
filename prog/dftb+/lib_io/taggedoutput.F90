@@ -101,9 +101,6 @@ module taggedoutput
   !> Repulsive energy
   character(*), parameter, public :: tag_egyRep     = 'repulsive_energy'
 
-  !> Total energy
-  character(*), parameter, public :: tag_egyTotal   = 'total_energy'
-
   !> Repulsive stress
   character(*), parameter, public :: tag_stressRep  = 'repulsive_stress'
 

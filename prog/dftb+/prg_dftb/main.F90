@@ -630,7 +630,7 @@ contains
       call writeAutotestTag(autotestTag, tPeriodic, cellVol, tMulliken, qOutput,&
           & derivs, chrgForces, excitedDerivs, tStress, totalStress, pDynMatrix,&
           & energy%EMermin, extPressure, energy%EGibbs, coord0, tLocalise, localisation, esp)
-      call writeAdditionalAutotestTag(fdAutotest, autotestTag, tPeriodic,&
+      call writeAdditionalAutotestTag(autotestTag, tPeriodic,&
           & energy%Etotal, energy%Erep, repDerivs, tStress, repStress)
     end if
     if (tWriteResultsTag) then
