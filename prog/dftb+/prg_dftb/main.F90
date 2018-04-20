@@ -72,6 +72,9 @@ module main
   use mdintegrator
   use tempprofile
   use elstatpot, only : TElStatPotentials
+  use ranlux
+  use atomicnumbers
+  use eigensolver, only : heev
   implicit none
   private
 
@@ -176,6 +179,8 @@ contains
 
     !> locality measure for the wavefunction
     real(dp) :: localisation
+
+#:include "freq_dec.F90"
 
     call initGeoOptParameters(tCoordOpt, nGeoSteps, tGeomEnd, tCoordStep, tStopDriver, iGeoStep,&
         & iLatGeoStep)
@@ -603,6 +608,7 @@ contains
     if (env%tGlobalMaster .and. tDerivs) then
       call getHessianMatrix(derivDriver, pDynMatrix)
       call writeHessianOut(hessianOut, pDynMatrix)
+#:include "freq_main.F90"
     else
       nullify(pDynMatrix)
     end if
