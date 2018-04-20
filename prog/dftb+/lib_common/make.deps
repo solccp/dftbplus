@@ -3,6 +3,11 @@ accuracy.o = accuracy.o
 _mod_accuracy: accuracy.o
 _mod_accuracy = $(accuracy.o)
 
+atomicnumbers.o:
+atomicnumbers.o = atomicnumbers.o
+_mod_atomicnumbers: atomicnumbers.o
+_mod_atomicnumbers = $(atomicnumbers.o)
+
 assert.o: common.fypp _mod_io
 assert.o = assert.o $(common.fypp) $(_mod_io)
 _mod_assert: assert.o
