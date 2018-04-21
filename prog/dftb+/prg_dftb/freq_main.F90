@@ -284,13 +284,13 @@
     end do
     write(*,*)
 
-!    if (tWriteDetailedOut) then
-!      write(fdUser,*)'Vibrational modes (cm-1):'
-!      do ii = nindep+1, 3*nAtom
-!        write(fdUser,'(f8.2)')eigenValues(ii)*Hartree__cm
-!      end do
-!      write(fdUser,*)
-!    end if
+    open(newunit=jj, file='FREQ.DAT', action="write", status="replace", form="formatted")
+      write(jj,*)'Vibrational modes (cm-1):'
+      do ii = nindep+1, 3*nAtom
+        write(jj,'(f8.2)')eigenValues(ii)*Hartree__cm
+      end do
+      write(jj,*)
+    close(jj)
 
     if (tNormalModes) then
         fdNormalModes = 201
