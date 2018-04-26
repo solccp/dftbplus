@@ -541,6 +541,7 @@ contains
           & modifier=modifier, child=field)
       call convertByMul(char(modifier), lengthUnits, field, ctrl%deriv2ndDelta)
       ctrl%tConvrgForces = .true.
+      call getChildValue(node, "WriteNormalModes", ctrl%tNormalModes, .false.)
 
     case ("velocityverlet")
       ! molecular dynamics

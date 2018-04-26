@@ -334,6 +334,10 @@
         close(fdNormalModes)
     end if
 
+    open(newunit=info, file=autotestTag, action="write", status="old", position="append")
+    call writeTagged(info, tag_frequencies, eigenValues(nindep+1:))
+    close(info)
+
 
     DEALLOCATE(eigenValues)
     DEALLOCATE(basis)

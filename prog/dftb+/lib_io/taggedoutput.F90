@@ -107,6 +107,9 @@ module taggedoutput
   !> Kinetic stress
   character(*), parameter, public :: tag_stressKE   = 'kinetic_stress'
 
+  !> Vibrational frequencies
+  character(*), parameter, public :: tag_frequencies   = 'frequencies'
+
 
   ! general format strings
 

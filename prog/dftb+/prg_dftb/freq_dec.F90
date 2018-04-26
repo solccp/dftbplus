@@ -6,7 +6,7 @@
 !  real(dp) :: dotpr(6,6)
   real(dp), parameter :: offsetlinear=1.0e-4_dp
   real(dp) :: det, det1, det2, rnorm
-  logical :: centinv, tNormalModes=.false.
+  logical :: centinv
   integer :: nindep, ngerade, iseed=1234235
   integer :: lwork, n3, info, licz, ll
   real(dp), dimension(:), allocatable :: work

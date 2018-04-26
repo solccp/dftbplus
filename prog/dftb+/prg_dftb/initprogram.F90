@@ -400,6 +400,9 @@ module initprogram
   !> Is this a derivatives calc?
   logical :: tDerivs
 
+  !> Do we need vibrational normal modes in molden format?
+  logical :: tNormalModes
+
   !> Do we need Mulliken charges?
   logical :: tMulliken
 
@@ -1404,6 +1407,7 @@ contains
     tUseConvergedForces = (input%ctrl%tConvrgForces .and. tSccCalc) ! no point if not SCC
     tMD = input%ctrl%tMD
     tDerivs = input%ctrl%tDerivs
+    tNormalModes = input%ctrl%tNormalModes
     tPrintMulliken = input%ctrl%tPrintMulliken
     tEField = input%ctrl%tEfield ! external electric field
     tMulliken = input%ctrl%tMulliken .or. tPrintMulliken .or. tEField

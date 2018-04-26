@@ -178,6 +178,9 @@ module inputdata_module
     !> Finite difference derivatives calculation?
     logical :: tDerivs     = .false.
 
+    !> Write vibrational normal modes in molden format?
+    logical :: tNormalModes = .false.
+
     !> Should central cell coordinates be output?
     logical :: tShowFoldedCoord
 
