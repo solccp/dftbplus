@@ -333,10 +333,11 @@
         write(fdNormalModes,*) '' 
         close(fdNormalModes)
     end if
-
-    open(newunit=info, file=autotestTag, action="write", status="old", position="append")
-    call writeTagged(info, tag_frequencies, eigenValues(nindep+1:))
-    close(info)
+    if (tWriteAutotest) then
+        open(newunit=info, file=autotestTag, action="write", status="old", position="append")
+        call writeTagged(info, tag_frequencies, eigenValues(nindep+1:))
+        close(info)
+    end if
 
 
     DEALLOCATE(eigenValues)
