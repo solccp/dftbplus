@@ -109,6 +109,9 @@ module taggedoutput
   !> logical string format
   character(len=lenLabel) :: formLogical
 
+  !> Vibrational frequencies
+  character(*), parameter, public :: tag_frequencies   = 'frequencies'
+
 
   !> is the write initialised? required to get relevant machine/compiler constants. Should all be
   !> stored as a derived type

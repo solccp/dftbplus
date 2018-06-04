@@ -20,7 +20,7 @@
           do ll = 1, 3
             jCount = jCount + 1
             pDynMatrix(jCount,iCount) = pDynMatrix(jCount,iCount) &
-                & / (sqrt(mass(species(ii))) * sqrt(mass(species(jj))))
+                & / (sqrt(mass(ii)) * sqrt(mass(jj)))
           end do
         end do
       end do
@@ -30,10 +30,10 @@
     xvec = 0.0_dp
     do ii = 1, nAtom
         do jj = 1, 3
-            xvec(jj) = xvec(jj) + mass(species(ii))*coord0(jj,ii)
+            xvec(jj) = xvec(jj) + mass(ii)*coord0(jj,ii)
         end do
     end do
-    prod = sum(mass(species(:)))
+    prod = sum(mass(:))
     xvec(:) = xvec(:) / prod
 
     do ii = 1, nAtom
@@ -75,20 +75,20 @@
     !############################
     basis = 0.0_dp
     do ii=1, nAtom
-      basis(1+3*(ii-1),1) = sqrt(mass(species(ii)))
-      basis(2+3*(ii-1),2) = sqrt(mass(species(ii)))
-      basis(3+3*(ii-1),3) = sqrt(mass(species(ii)))
+      basis(1+3*(ii-1),1) = sqrt(mass(ii))
+      basis(2+3*(ii-1),2) = sqrt(mass(ii))
+      basis(3+3*(ii-1),3) = sqrt(mass(ii))
     end do
     !#########################
     !## construct rotations ##
     !#########################
     do ii=1, nAtom
-      basis(2+3*(ii-1),4)= -sqrt(mass(species(ii)))*coordcm(3,ii)
-      basis(3+3*(ii-1),4)=  sqrt(mass(species(ii)))*coordcm(2,ii)
-      basis(3+3*(ii-1),5)= -sqrt(mass(species(ii)))*coordcm(1,ii)
-      basis(1+3*(ii-1),5)=  sqrt(mass(species(ii)))*coordcm(3,ii)
-      basis(1+3*(ii-1),6)= -sqrt(mass(species(ii)))*coordcm(2,ii)
-      basis(2+3*(ii-1),6)=  sqrt(mass(species(ii)))*coordcm(1,ii)
+      basis(2+3*(ii-1),4)= -sqrt(mass(ii))*coordcm(3,ii)
+      basis(3+3*(ii-1),4)=  sqrt(mass(ii))*coordcm(2,ii)
+      basis(3+3*(ii-1),5)= -sqrt(mass(ii))*coordcm(1,ii)
+      basis(1+3*(ii-1),5)=  sqrt(mass(ii))*coordcm(3,ii)
+      basis(1+3*(ii-1),6)= -sqrt(mass(ii))*coordcm(2,ii)
+      basis(2+3*(ii-1),6)=  sqrt(mass(ii))*coordcm(1,ii)
     end do
 
     !######################################################
@@ -259,7 +259,7 @@
 
 
     do ii=1, nAtom
-        massx=1.0_dp/sqrt(mass(species(ii)))
+        massx=1.0_dp/sqrt(mass(ii))
         do jj =1, 3
             kk = jj+3*(ii-1)
             call dscal(n3,massx,pDynMatrix(kk,1),n3)
@@ -284,13 +284,13 @@
     end do
     write(*,*)
 
-!    if (tWriteDetailedOut) then
-!      write(fdUser,*)'Vibrational modes (cm-1):'
-!      do ii = nindep+1, 3*nAtom
-!        write(fdUser,'(f8.2)')eigenValues(ii)*Hartree__cm
-!      end do
-!      write(fdUser,*)
-!    end if
+    open(newunit=jj, file='FREQ.DAT', action="write", status="replace", form="formatted")
+      write(jj,*)'Vibrational modes (cm-1):'
+      do ii = nindep+1, 3*nAtom
+        write(jj,'(f8.2)')eigenValues(ii)*Hartree__cm
+      end do
+      write(jj,*)
+    close(jj)
 
     if (tNormalModes) then
         fdNormalModes = 201
@@ -333,6 +333,10 @@
         write(fdNormalModes,*) '' 
         close(fdNormalModes)
     end if
+
+    open(newunit=info, file=autotestTag, action="write", status="old", position="append")
+    call writeTagged(info, tag_frequencies, eigenValues(nindep+1:))
+    close(info)
 
 
     DEALLOCATE(eigenValues)

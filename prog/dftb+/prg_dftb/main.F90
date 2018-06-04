@@ -605,7 +605,6 @@ contains
     if (env%tGlobalMaster .and. tDerivs) then
       call getHessianMatrix(derivDriver, pDynMatrix)
       call writeHessianOut(hessianOut, pDynMatrix)
-#:include "freq_main.F90"
     else
       nullify(pDynMatrix)
     end if
@@ -642,6 +641,11 @@ contains
       call writeDetailedXml(runId, speciesName, species0, pCoord0Out, tPeriodic, latVec, tRealHS,&
           & nKPoint, nSpin, size(eigen, dim=1), nOrb, kPoint, kWeight, filling, occNatural)
     end if
+    
+    if (env%tGlobalMaster .and. tDerivs) then
+#:include "freq_main.F90"    
+    end if
+    
 
     call env%globalTimer%startTimer(globalTimers%postGeoOpt)
 
