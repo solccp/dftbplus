@@ -405,15 +405,9 @@ contains
             & SSqrCplx)
         call env%globalTimer%stopTimer(globalTimers%energyDensityMatrix)
         call getGradients(env, sccCalc, tEField, tXlbomd, nonSccDeriv, Efield, rhoPrim, ERhoPrim,&
-<<<<<<< HEAD
-            & qOutput, q0, skHamCont, skOverCont, pRepCont, neighborList, nNeighbor, species,&
-            & img2CentCell, iSparseStart, orb, potential, coord, derivs, repDerivs, iRhoPrim, thirdOrd,&
-            & chrgForces, dispersion)
-=======
             & qOutput, q0, skHamCont, skOverCont, pRepCont, neighbourList, nNeighbourSK,&
-            & nNeighbourRep, species, img2CentCell, iSparseStart, orb, potential, coord, derivs,&
+            & nNeighbourRep, species, img2CentCell, iSparseStart, orb, potential, coord, derivs, repDerivs, &
             & iRhoPrim, thirdOrd, chrgForces, dispersion)
->>>>>>> upstream/master
         if (tLinResp) then
           derivs(:,:) = derivs + excitedDerivs
         end if
@@ -421,18 +415,11 @@ contains
 
         if (tStress) then
           call env%globalTimer%startTimer(globalTimers%stressCalc)
-<<<<<<< HEAD
-          call getStress(env, sccCalc, tEField, nonSccDeriv, EField, rhoPrim, ERhoPrim, qOutput,&
-              & q0, skHamCont, skOverCont, pRepCont, neighborList, nNeighbor, species,&
-              & img2CentCell, iSparseStart, orb, potential, coord, latVec, invLatVec, cellVol,&
-              & coord0, totalStress, repStress, totalLatDeriv, intPressure, iRhoPrim, dispersion)
-=======
           call getStress(env, sccCalc, thirdOrd, tEField, nonSccDeriv, EField, rhoPrim, ERhoPrim,&
               & qOutput, q0, skHamCont, skOverCont, pRepCont, neighbourList, nNeighbourSK,&
               & nNeighbourRep, species, img2CentCell, iSparseStart, orb, potential, coord, latVec,&
-              & invLatVec, cellVol, coord0, totalStress, totalLatDeriv, intPressure, iRhoPrim,&
+              & invLatVec, cellVol, coord0, totalStress, repStress, totalLatDeriv, intPressure, iRhoPrim,&
               & dispersion)
->>>>>>> upstream/master
           call env%globalTimer%stopTimer(globalTimers%stressCalc)
           call printVolume(cellVol)
           ! MD case includes the atomic kinetic energy contribution, so print that later
@@ -3902,7 +3889,7 @@ contains
   !> Calculates the gradients
   subroutine getGradients(env, sccCalc, tEField, tXlbomd, nonSccDeriv, Efield, rhoPrim, ERhoPrim,&
       & qOutput, q0, skHamCont, skOverCont, pRepCont, neighbourList, nNeighbourSK, nNeighbourRep,&
-      & species, img2CentCell, iSparseStart, orb, potential, coord, derivs, iRhoPrim, thirdOrd,&
+      & species, img2CentCell, iSparseStart, orb, potential, coord, derivs, repDerivs, iRhoPrim, thirdOrd,&
       & chrgForces, dispersion)
 
     !> Environment settings
@@ -4070,7 +4057,7 @@ contains
   subroutine getStress(env, sccCalc, thirdOrd, tEField, nonSccDeriv, EField, rhoPrim, ERhoPrim,&
       & qOutput, q0, skHamCont, skOverCont, pRepCont, neighbourList, nNeighbourSK, nNeighbourRep,&
       & species, img2CentCell, iSparseStart, orb, potential, coord, latVec, invLatVec, cellVol,&
-      & coord0, totalStress, totalLatDeriv, intPressure, iRhoPrim, dispersion)
+      & coord0, totalStress, repStress, totalLatDeriv, intPressure, iRhoPrim, dispersion)
 
     !> Environment settings
     type(TEnvironment), intent(in) :: env
