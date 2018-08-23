@@ -65,7 +65,7 @@ module parser
 
 
   !> Version of the current parser
-  integer, parameter :: parserVersion = 5
+  integer, parameter :: parserVersion = 6
 
 
   !> Version of the oldest parser for which compatibility is still maintained
@@ -1411,18 +1411,12 @@ contains
         call detailedError(child, "Invalid mixer '" // char(buffer) // "'")
       end select
 
-      ! Elstner gamma damping for X-H interactions
-      call getChildValue(node, "DampXH", ctrl%tDampH, .false.)
-      if (ctrl%tDampH) then
-        call getChildValue(node, "DampXHExponent", ctrl%dampExp)
-      end if
-
       if (geo%tPeriodic) then
         call getChildValue(node, "EwaldParameter", ctrl%ewaldAlpha, 0.0_dp)
         call getChildValue(node, "EwaldTolerance", ctrl%tolEwald, 1.0e-9_dp)
       end if
 
-      call readHBondCorrection(node, geo, ctrl)
+      call readHCorrection(node, geo, ctrl)
 
       ! spin
       call getChildValue(node, "SpinPolarisation", value, "", child=child, &
@@ -2159,8 +2153,8 @@ contains
   end subroutine readDifferentiation
 
 
-  !> Reads the H-bond (H5) correction.
-  subroutine readHBondCorrection(node, geo, ctrl)
+  !> Reads the H corrections (H5, Damp)
+  subroutine readHCorrection(node, geo, ctrl)
 
     !> Node containing the h-bond correction sub-block.
     type(fnode), pointer, intent(in) :: node
@@ -2176,20 +2170,21 @@ contains
     real(dp) :: h5ScalingDef
     integer :: iSp
 
-    ! H5 correction
-    call getChildValue(node, "HBondCorrection", value, "None", child=child)
+    ! X-H interaction corrections including H5 and damping
+    ctrl%tDampH = .false.
+    ctrl%h5SwitchedOn = .false.
+    call getChildValue(node, "HCorrection", value, "None", child=child)
     call getNodeName(value, buffer)
     select case (char(buffer))
     case ("none")
-      ctrl%h5SwitchedOn = .false.
+      ! nothing to do
+    case ("damping")
+      ! Switch the correction on
+      ctrl%tDampH = .true.
+      call getChildValue(value, "Exponent", ctrl%dampExp)
     case ("h5")
       ! Switch the correction on
       ctrl%h5SwitchedOn = .true.
-
-      ! H5 should not be used with X-H damping
-      if (ctrl%tDampH .and. ctrl%h5SwitchedOn) then
-        call error("H5 correction is not compatible with X-H damping")
-      end if
 
       call getChildValue(value, "RScaling", ctrl%h5RScale, 0.714_dp)
       call getChildValue(value, "WScaling", ctrl%h5WScale, 0.25_dp)
@@ -2215,10 +2210,10 @@ contains
       end do
     case default
       call getNodeHSDName(value, buffer)
-      call detailedError(child, "Invalid value of HBondCorrection '" // char(buffer) // "'")
+      call detailedError(child, "Invalid HCorrection '" // char(buffer) // "'")
     end select
 
-  end subroutine readHBondCorrection
+  end subroutine readHCorrection
 
 
   !> Reads Slater-Koster files
@@ -3283,13 +3278,13 @@ contains
       if (associated(child2)) then
         allocate(ctrl%pipekMezeyInp)
         associate(inp => ctrl%pipekMezeyInp)
-          call getChildValue(child2, "Tollerance", inp%tolerance, 1.0E-4_dp)
           call getChildValue(child2, "MaxIterations", inp%maxIter, 100)
+          tPipekDense = .true.
           if (.not. geo%tPeriodic) then
             call getChildValue(child2, "Dense", tPipekDense, .false.)
             if (.not. tPipekDense) then
               call init(lr1)
-              call getChild(child2, "SparseTollerances", child=child3, requested=.false.)
+              call getChild(child2, "SparseTolerances", child=child3, requested=.false.)
               if (associated(child3)) then
                 call getChildValue(child3, "", 1, lr1)
                 if (len(lr1) < 1) then
@@ -3300,10 +3295,13 @@ contains
               else
                 allocate(inp%sparseTols(4))
                 inp%sparseTols = [0.1_dp, 0.01_dp, 1.0E-6_dp, 1.0E-12_dp]
-                call setChildValue(child2, "Tollerances", inp%sparseTols)
+                call setChildValue(child2, "SparseTolerances", inp%sparseTols)
               end if
               call destruct(lr1)
             end if
+          end if
+          if (tPipekDense) then
+            call getChildValue(child2, "Tolerance", inp%tolerance, 1.0E-4_dp)
           end if
         end associate
       else
