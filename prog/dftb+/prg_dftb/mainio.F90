@@ -2014,7 +2014,7 @@ contains
     call writeTagged(fdAutotest, tag_egyRep, repEnergy)
 
     if (allocated(repDerivs)) then
-      call writeTagged(fdAutotest, tag_forceRep, repDerivs)
+      call writeTagged(fdAutotest, tag_forceRep, -repDerivs)
     end if
 
     if (tPeriodic) then
