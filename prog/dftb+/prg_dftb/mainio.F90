@@ -2026,14 +2026,17 @@ contains
   end subroutine writeAdditionalAutotestTag
 
   !> Writes out machine readable data
-  subroutine writeResultsTag(fileName, energy, derivs, chrgForces, tStress, totalStress,&
-      & pDynMatrix, tPeriodic, cellVol, tMulliken, qOutput, q0)
+  subroutine writeResultsTag(fileName, energy, TS, derivs, chrgForces, tStress,&
+      & totalStress, pDynMatrix, tPeriodic, cellVol, tMulliken, qOutput, q0)
 
     !> Name of output file
     character(*), intent(in) :: fileName
 
     !> Energy contributions and total
     type(TEnergies), intent(in) :: energy
+
+    !> Electron entropy times temperature
+    real(dp), intent(in) :: TS(:)
 
     !> Atomic derivatives (allocation status used as a flag)
     real(dp), allocatable, intent(in) :: derivs(:,:)
@@ -2074,6 +2077,9 @@ contains
 
     call writeTagged(fd, tag_freeEgy, energy%EMermin)
     call writeTagged(fd, tag_egyTotal, energy%ETotal)
+
+    ! extrapolated zero temperature energy
+    call writeTagged(fd, tag_egy0Total, energy%Ezero)
 
     if (allocated(derivs)) then
       call writeTagged(fd, tag_forceTot, -derivs)
@@ -2705,6 +2711,7 @@ contains
     end if
 
     write(fd, format2U) 'Total energy', energy%Etotal, 'H', energy%Etotal * Hartree__eV, 'eV'
+    write(fd, format2U) 'Extrapolated to 0', energy%Ezero, 'H', energy%Ezero * Hartree__eV, 'eV'
     write(fd, format2U) 'Total Mermin free energy', energy%Etotal - sum(TS), 'H',&
         & (energy%Etotal - sum(TS)) * Hartree__eV, 'eV'
     if (tPeriodic .and. pressure /= 0.0_dp) then
@@ -3130,8 +3137,8 @@ contains
 
   !> Second group of output data during molecular dynamics
   subroutine writeMdOut2(fd, tStress, tBarostat, tLinResp, tEField, tFixEf, tPrintMulliken,&
-      & energy, latVec, cellVol, cellPressure, pressure, tempIon, absEField, qOutput, q0,&
-      & dipoleMoment)
+      & energy, energiesCasida, latVec, cellVol, cellPressure, pressure, tempIon, absEField,&
+      & qOutput, q0, dipoleMoment)
 
     !> File ID
     integer, intent(in) :: fd
@@ -3156,6 +3163,9 @@ contains
 
     !> energy contributions
     type(TEnergies), intent(in) :: energy
+
+    !> excitation energies, if allocated
+    real(dp), allocatable, intent(inout) :: energiesCasida(:)
 
     !> Lattice vectors if periodic
     real(dp), intent(in) :: latVec(:,:)
@@ -3185,6 +3195,7 @@ contains
     real(dp), intent(inout), allocatable :: dipoleMoment(:)
 
     integer :: ii
+    character(lc) :: strTmp
 
     if (tStress) then
       if (tBarostat) then
@@ -3202,9 +3213,18 @@ contains
             & Hartree__eV * energy%EGibbsKin, 'eV'
       end if
     end if
-    if (tLinResp .and. energy%Eexcited /= 0.0_dp) then
-      write(fd, format2U) "Excitation Energy", energy%Eexcited, "H",&
-          & Hartree__eV * energy%Eexcited, "eV"
+    if (tLinResp) then
+      if (energy%Eexcited /= 0.0_dp) then
+        write(fd, format2U) "Excitation Energy", energy%Eexcited, "H",&
+            & Hartree__eV * energy%Eexcited, "eV"
+      end if
+      if (allocated(energiesCasida)) then
+        do ii = 1, size(energiesCasida)
+          write(strTmp,"('Excitation ',I0)")ii
+          write(fd, format2U) trim(strTmp), energiesCasida(ii), "H",&
+              & Hartree__eV * energiesCasida(ii), "eV"
+        end do
+      end if
     end if
     write(fd, format2U) 'Potential Energy', energy%EMermin,'H', energy%EMermin * Hartree__eV, 'eV'
     write(fd, format2U) 'MD Kinetic Energy', energy%Ekin, 'H', energy%Ekin * Hartree__eV, 'eV'
@@ -3648,13 +3668,17 @@ contains
 
 
   !> Prints current total energies
-  subroutine printEnergies(energy)
+  subroutine printEnergies(energy, TS)
 
     !> energy components
     type(TEnergies), intent(in) :: energy
 
+    !> Electron entropy times temperature
+    real(dp), intent(in) :: TS(:)
+
     write(stdOut, *)
     write(stdOut, format2U) "Total Energy", energy%Etotal,"H", Hartree__eV * energy%Etotal,"eV"
+    write(stdOut, format2U) "Extrapolated to 0", energy%Ezero, "H", energy%Ezero, "eV"
     write(stdOut, format2U) "Total Mermin free energy", energy%EMermin, "H",&
         & Hartree__eV * energy%EMermin," eV"
 

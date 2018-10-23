@@ -178,6 +178,9 @@ contains
     !> locality measure for the wavefunction
     real(dp) :: localisation
 
+    !> All of the excited energies actuall solved by Casida routines (if used)
+    real(dp), allocatable :: energiesCasida(:)
+
 #:include "freq_dec.F90"
 
     call initGeoOptParameters(tCoordOpt, nGeoSteps, tGeomEnd, tCoordStep, tStopDriver, iGeoStep,&
@@ -346,17 +349,18 @@ contains
       call env%globalTimer%stopTimer(globalTimers%scc)
 
       call env%globalTimer%startTimer(globalTimers%postSCC)
+
       if (tLinResp) then
         if (withMpi) then
           call error("Linear response calc. does not work with MPI yet")
         end if
-        call ensureLinRespConditions(t3rd, tRealHS, tPeriodic, tForces)
+        call ensureLinRespConditions(t3rd, tRealHS, tPeriodic, tCasidaForces)
         call calculateLinRespExcitations(env, lresp, parallelKS, sccCalc, qOutput, q0, over,&
             & eigvecsReal, eigen(:,1,:), filling(:,1,:), coord0, species, speciesName, orb,&
             & skHamCont, skOverCont, autotestTag, runId, neighbourList, nNeighbourSK,&
-            & denseDesc, iSparseStart, img2CentCell, tWriteAutotest, tForces, tLinRespZVect,&
-            & tPrintExcitedEigvecs, tPrintEigvecsTxt, nonSccDeriv, energy, SSqrReal, rhoSqrReal,&
-            & excitedDerivs, occNatural)
+            & denseDesc, iSparseStart, img2CentCell, tWriteAutotest, tCasidaForces,&
+            & tLinRespZVect, tPrintExcitedEigvecs, tPrintEigvecsTxt, nonSccDeriv, energy,&
+            & energiesCasida, SSqrReal, rhoSqrReal, excitedDerivs, occNatural)
       end if
 
       if (tXlbomd) then
@@ -394,7 +398,7 @@ contains
             & nSpin, qOutput, velocities)
       end if
 
-      call printEnergies(energy)
+      call printEnergies(energy, TS)
 
       if (tForces) then
         call env%globalTimer%startTimer(globalTimers%forceCalc)
@@ -408,7 +412,7 @@ contains
             & qOutput, q0, skHamCont, skOverCont, pRepCont, neighbourList, nNeighbourSK,&
             & nNeighbourRep, species, img2CentCell, iSparseStart, orb, potential, coord, derivs, repDerivs, &
             & iRhoPrim, thirdOrd, chrgForces, dispersion)
-        if (tLinResp) then
+        if (tCasidaForces) then
           derivs(:,:) = derivs + excitedDerivs
         end if
         call env%globalTimer%stopTimer(globalTimers%forceCalc)
@@ -504,8 +508,13 @@ contains
         else if (tGeoOpt) then
           tCoordsChanged = .true.
           if (tCoordStep) then
-            call getNextCoordinateOptStep(pGeoCoordOpt, energy%EMermin, derivs, indMovedAtom,&
-                & coord0, diffGeo, tCoordEnd)
+            if (.not. tCasidaForces) then
+              call getNextCoordinateOptStep(pGeoCoordOpt, energy, derivs, indMovedAtom,&
+                  & coord0, diffGeo, tCoordEnd, .true.)
+            else
+              call getNextCoordinateOptStep(pGeoCoordOpt, energy, derivs, indMovedAtom,&
+                  & coord0, diffGeo, tCoordEnd, .false.)
+            end if
             if (.not. tLatOpt) then
               tGeomEnd = tCoordEnd
             end if
@@ -544,8 +553,8 @@ contains
               energy%EGibbs = energy%EMermin + extPressure * cellVol
             end if
             call writeMdOut2(fdMd, tStress, tBarostat, tLinResp, tEField, tFixEf, tPrintMulliken,&
-                & energy, latVec, cellVol, intPressure, extPressure, tempIon, absEField, qOutput,&
-                & q0, dipoleMoment)
+                & energy, energiesCasida, latVec, cellVol, intPressure, extPressure, tempIon,&
+                & absEField, qOutput, q0, dipoleMoment)
             call writeCurrentGeometry(geoOutFile, pCoord0Out, .false., .true., .true., tFracCoord,&
                 & tPeriodic, tPrintMulliken, species0, speciesName, latVec, iGeoStep, iLatGeoStep,&
                 & nSpin, qOutput, velocities)
@@ -638,7 +647,7 @@ contains
           & energy%Etotal, energy%Erep, repDerivs, tStress, repStress)
     end if
     if (tWriteResultsTag) then
-      call writeResultsTag(resultsTag, energy, derivs, chrgForces, tStress, totalStress,&
+      call writeResultsTag(resultsTag, energy, TS, derivs, chrgForces, tStress, totalStress,&
           & pDynMatrix, tPeriodic, cellVol, tMulliken, qOutput, q0)
     end if
     if (tWriteDetailedXML) then
@@ -2656,6 +2665,8 @@ contains
     energy%atomTotal(:) = energy%atomElec + energy%atomRep + energy%atomDisp
     energy%Etotal = energy%Eelec + energy%Erep + energy%eDisp
     energy%EMermin = energy%Etotal - sum(TS)
+    ! extrapolated to 0 K
+    energy%Ezero = energy%Etotal - 0.5_dp * sum(TS)
     energy%EGibbs = energy%EMermin + cellVol * extPressure
 
   end subroutine getEnergies
@@ -3028,7 +3039,7 @@ contains
     !> periodic boundary conditions
     logical, intent(in) :: tPeriodic
 
-    !> forces being evaluated
+    !> forces being evaluated in the excited state
     logical, intent(in) :: tForces
 
     if (t3rd) then
@@ -3044,12 +3055,12 @@ contains
   end subroutine ensureLinRespConditions
 
 
- !> Do the linear response excitation calculation.
+  !> Do the linear response excitation calculation.
   subroutine calculateLinRespExcitations(env, lresp, parallelKS, sccCalc, qOutput, q0, over,&
       & eigvecsReal, eigen, filling, coord0, species, speciesName, orb, skHamCont, skOverCont,&
       & autotestTag, runId, neighbourList, nNeighbourSK, denseDesc, iSparseStart, img2CentCell,&
       & tWriteAutotest, tForces, tLinRespZVect, tPrintExcEigvecs, tPrintExcEigvecsTxt, nonSccDeriv,&
-      & energy, work, rhoSqrReal, excitedDerivs, occNatural)
+      & energy, energies, work, rhoSqrReal, excitedDerivs, occNatural)
 
     !> Environment settings
     type(TEnvironment), intent(in) :: env
@@ -3123,7 +3134,7 @@ contains
     !> should regression test data be written
     logical, intent(in) :: tWriteAutotest
 
-    !> forces to be calculated
+    !> forces to be calculated in the excited state
     logical, intent(in) :: tForces
 
     !> require the Z vector for excited state properties
@@ -3140,6 +3151,9 @@ contains
 
     !> Energy contributions and total
     type(TEnergies), intent(inout) :: energy
+
+    !> energes of all solved states
+    real(dp), intent(inout), allocatable :: energies(:)
 
     !> Working array of the size of the dense matrices.
     real(dp), intent(out) :: work(:,:)
@@ -3185,8 +3199,8 @@ contains
       end if
       call addGradients(tSpin, lresp, denseDesc%iAtomStart, eigvecsReal, eigen, work, filling,&
           & coord0, sccCalc, dQAtom, pSpecies0, neighbourList%iNeighbour, img2CentCell, orb,&
-          & skHamCont, skOverCont, tWriteAutotest, fdAutotest, energy%Eexcited, excitedDerivs,&
-          & nonSccDeriv, rhoSqrReal, occNatural, naturalOrbs)
+          & skHamCont, skOverCont, tWriteAutotest, fdAutotest, energy%Eexcited, energies,&
+          & excitedDerivs, nonSccDeriv, rhoSqrReal, occNatural, naturalOrbs)
       if (tPrintExcEigvecs) then
         call writeRealEigvecs(env, runId, neighbourList, nNeighbourSK, denseDesc, iSparseStart,&
             & img2CentCell, pSpecies0, speciesName, orb, over, parallelKS, tPrintExcEigvecsTxt,&
@@ -3195,7 +3209,7 @@ contains
     else
       call calcExcitations(lresp, tSpin, denseDesc, eigvecsReal, eigen, work, filling, coord0,&
           & sccCalc, dQAtom, pSpecies0, neighbourList%iNeighbour, img2CentCell, orb,&
-          & tWriteAutotest, fdAutotest, energy%Eexcited)
+          & tWriteAutotest, fdAutotest, energy%Eexcited, energies)
     end if
     energy%Etotal = energy%Etotal + energy%Eexcited
     energy%EMermin = energy%EMermin + energy%Eexcited
@@ -4403,14 +4417,14 @@ contains
 
 
   !> Returns the coordinates for the next coordinate optimisation step.
-  subroutine getNextCoordinateOptStep(pGeoCoordOpt, EMermin, derivss, indMovedAtom, coords0,&
-      & diffGeo, tCoordEnd)
+  subroutine getNextCoordinateOptStep(pGeoCoordOpt, energy, derivss, indMovedAtom, coords0,&
+      & diffGeo, tCoordEnd, tRemoveExcitation)
 
     !> optimiser for atomic coordinates
     type(OGeoOpt), intent(inout) :: pGeoCoordOpt
 
-    !> electronic free energy U -TS
-    real(dp), intent(in) :: EMermin
+    !> energies
+    type(TEnergies), intent(in) :: energy
 
     !> Derivative of energy with respect to atomic coordinates
     real(dp), intent(in) :: derivss(:,:)
@@ -4427,12 +4441,20 @@ contains
     !> has the geometry optimisation finished
     logical, intent(out) :: tCoordEnd
 
+    !> remove excited state energy from the step, to be consistent with the forces
+    logical, intent(in) :: tRemoveExcitation
+
     real(dp) :: derivssMoved(3 * size(indMovedAtom))
     real(dp), target :: newCoordsMoved(3 * size(indMovedAtom))
     real(dp), pointer :: pNewCoordsMoved(:,:)
 
     derivssMoved(:) = reshape(derivss(:, indMovedAtom), [3 * size(indMovedAtom)])
-    call next(pGeoCoordOpt, EMermin, derivssMoved, newCoordsMoved, tCoordEnd)
+    if (tRemoveExcitation) then
+      call next(pGeoCoordOpt, energy%EMermin - energy%Eexcited, derivssMoved, newCoordsMoved,&
+          & tCoordEnd)
+    else
+      call next(pGeoCoordOpt, energy%EMermin, derivssMoved, newCoordsMoved, tCoordEnd)
+    end if
     pNewCoordsMoved(1:3, 1:size(indMovedAtom)) => newCoordsMoved(1 : 3 * size(indMovedAtom))
     diffGeo = maxval(abs(pNewCoordsMoved - coords0(:, indMovedAtom)))
     coords0(:, indMovedAtom) = pNewCoordsMoved

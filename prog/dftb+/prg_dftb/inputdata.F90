@@ -85,6 +85,8 @@ module inputdata_module
     !> Read starting charges from disc
     logical :: tReadChrg = .false.
 
+    logical :: tSkipChrgChecksum = .false.
+
     !> Disc charges are stored as ascii or binary files
     logical :: tReadChrgAscii = .true.
 
@@ -157,7 +159,10 @@ module inputdata_module
     logical :: tProjEigenvecs = .false.
 
     !> Evaluate forces
-    logical :: tForces     = .false.
+    logical :: tForces = .false.
+
+    !> Evaluate force contributions from the excited state if required and (tForces)
+    logical :: tCasidaForces = .false.
 
     !> force evaluation method
     integer :: forceType
