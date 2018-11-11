@@ -3677,10 +3677,14 @@ contains
     real(dp), intent(in) :: TS(:)
 
     write(stdOut, *)
+
+    write(stdOut, format2U) 'Total Electronic energy', energy%Eelec, 'H', energy%Eelec * Hartree__eV,&
+        & 'eV'
+    write(stdOut, format2U) 'Repulsive energy', energy%Erep, 'H', energy%Erep * Hartree__eV, 'eV'
     write(stdOut, format2U) "Total Energy", energy%Etotal,"H", Hartree__eV * energy%Etotal,"eV"
-    write(stdOut, format2U) "Extrapolated to 0", energy%Ezero, "H", energy%Ezero, "eV"
+    write(stdOut, format2U) "Extrapolated to 0K", energy%Ezero, "H", energy%Ezero*Hartree__eV, "eV"
     write(stdOut, format2U) "Total Mermin free energy", energy%EMermin, "H",&
-        & Hartree__eV * energy%EMermin," eV"
+        & Hartree__eV * energy%EMermin,"eV"
 
   end subroutine printEnergies
 
