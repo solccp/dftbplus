@@ -412,6 +412,12 @@ contains
     phases(:,:) = exp((0.0_dp, 1.0_dp) * matmul(transpose(cellVec), kPoints))
 
     ! Loop over all grid points
+!$OMP PARALLEL DEFAULT(NONE) PRIVATE(i3,i2,i1,xyz,curCoords,frac,allZero,iCell,iAtom,nonZeroIndices) &
+!$OMP PRIVATE(recVecs2p, ind, iSpecies, diff, xx, iL, val,atomAllOrbVal,nonZeroMask,nNonZero) &
+!$OMP PRIVATE(nonZeroIndContainer,atomOrbValReal,atomOrbValCmpl) &
+!$OMP SHARED(valueReal, valueCmpl, nPoints, tPeriodic, tReal, tAddDensities, gridVecs, origin, KIndexes) &
+!$OMP SHARED(latVecs, nCell, nOrb, nAtom, species, coords, iStos, angMoms, cutoffs, stos,eigVecsReal,phases,eigVecsCmpl)
+!$OMP DO
     lpI3: do i3 = 1, nPoints(3)
       curCoords(:, 3) = real(i3 - 1, dp) * gridVecs(:,3)
       lpI2: do i2 = 1, nPoints(2)
@@ -502,6 +508,8 @@ contains
         end do lpI1
       end do lpI2
     end do lpI3
+!$OMP END DO
+!$OMP END PARALLEL
 
   end subroutine local_getValue
 
