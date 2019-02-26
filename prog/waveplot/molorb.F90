@@ -396,6 +396,14 @@ contains
     integer :: nPoints(4)
     integer :: ind, i1, i2, i3, iEig, iAtom, iOrb, iM, iSpecies, iL, iCell
 
+!!$OMP PARALLEL DEFAULT(NONE) &
+!!$OMP PRIVATE(ind, i1, i2, i3, iEig, iAtom, iOrb, iM, iSpecies, iL, iCell) &
+!!$OMP PRIVATE(xx, val, atomOrbValCmpl, atomOrbValReal, nonZeroIndices, nonZeroIndContainer, nNonZero) &
+!!$OMP PRIVATE(allZero, nonZeroMask, curCoords, xyz, diff, frac, nPoints, phases) &
+!!$OMP SHARED(kPoints) &
+!!$OMP SHARED(valueReal, recVecs2p, valueCmpl, tPeriodic, tReal, tAddDensities, gridVecs, origin, kIndexes, atomAllOrbVal) &
+!!$OMP SHARED(latVecs, nCell, nOrb, nAtom, species, coords, iStos, angMoms, cutoffs, stos,eigVecsReal,eigVecsCmpl, cellVec) 
+
     ! Array for the contribution of each orbital (and its periodic images)
     if (tReal) then
       allocate(atomOrbValReal(nOrb))
@@ -405,6 +413,7 @@ contains
       nPoints = shape(valueCmpl)
     end if
 
+!    print*, nPoints, nCell, tReal
     ! Phase factors for the periodic image cell. Note: This will be conjugated in the scalar product
     ! below. This is fine as, in contrast to what was published, DFTB+ uses implicitely exp(-ikr) as
     ! a phase factor, as the unpack routines assemble the lower triangular matrix with exp(ikr) as
@@ -412,12 +421,8 @@ contains
     phases(:,:) = exp((0.0_dp, 1.0_dp) * matmul(transpose(cellVec), kPoints))
 
     ! Loop over all grid points
-!$OMP PARALLEL DEFAULT(NONE) PRIVATE(i3,i2,i1,xyz,curCoords,frac,allZero,iCell,iAtom,nonZeroIndices) &
-!$OMP PRIVATE(recVecs2p, ind, iSpecies, diff, xx, iL, val,atomAllOrbVal,nonZeroMask,nNonZero) &
-!$OMP PRIVATE(nonZeroIndContainer,atomOrbValReal,atomOrbValCmpl) &
-!$OMP SHARED(valueReal, valueCmpl, nPoints, tPeriodic, tReal, tAddDensities, gridVecs, origin, KIndexes) &
-!$OMP SHARED(latVecs, nCell, nOrb, nAtom, species, coords, iStos, angMoms, cutoffs, stos,eigVecsReal,phases,eigVecsCmpl)
-!$OMP DO
+
+!!$OMP DO
     lpI3: do i3 = 1, nPoints(3)
       curCoords(:, 3) = real(i3 - 1, dp) * gridVecs(:,3)
       lpI2: do i2 = 1, nPoints(2)
@@ -488,28 +493,30 @@ contains
                   & eigVecsReal(nonZeroIndices, iEig))
             end do
           else
-            ind = 0
+            ind = 0 
             do iEig = 1, nPoints(4)
               if (kIndexes(iEig) /= ind) then
                 ind = kIndexes(iEig)
                 atomOrbValCmpl(nonZeroIndices) = (0.0_dp, 0.0_dp)
+!$OMP PARALLEL DO DEFAULT(NONE) SHARED(atomAllOrbVal, phases, nCell, nonZeroIndices, ind)    reduction(+: atomOrbValCmpl) 
                 do iCell = 1, nCell
                   atomOrbValCmpl(nonZeroIndices) = &
                       & atomOrbValCmpl(nonZeroIndices) &
                       & + atomAllOrbVal(nonZeroIndices, iCell) &
                       & * phases(iCell, ind)
                 end do
+!$OMP END PARALLEL DO
               end if
               valueCmpl(i1, i2, i3, iEig) = dot_product( &
                   & atomOrbValCmpl(nonZeroIndices), &
                   & eigVecsCmpl(nonZeroIndices, iEig))
-            end do
+            end do          
           end if
         end do lpI1
       end do lpI2
     end do lpI3
-!$OMP END DO
-!$OMP END PARALLEL
+!!$OMP END DO
+!!$OMP END PARALLEL
 
   end subroutine local_getValue
 
