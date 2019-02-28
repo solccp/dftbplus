@@ -396,13 +396,6 @@ contains
     integer :: nPoints(4)
     integer :: ind, i1, i2, i3, iEig, iAtom, iOrb, iM, iSpecies, iL, iCell
 
-!!$OMP PARALLEL DEFAULT(NONE) &
-!!$OMP PRIVATE(ind, i1, i2, i3, iEig, iAtom, iOrb, iM, iSpecies, iL, iCell) &
-!!$OMP PRIVATE(xx, val, atomOrbValCmpl, atomOrbValReal, nonZeroIndices, nonZeroIndContainer, nNonZero) &
-!!$OMP PRIVATE(allZero, nonZeroMask, curCoords, xyz, diff, frac, nPoints, phases) &
-!!$OMP SHARED(kPoints) &
-!!$OMP SHARED(valueReal, recVecs2p, valueCmpl, tPeriodic, tReal, tAddDensities, gridVecs, origin, kIndexes, atomAllOrbVal) &
-!!$OMP SHARED(latVecs, nCell, nOrb, nAtom, species, coords, iStos, angMoms, cutoffs, stos,eigVecsReal,eigVecsCmpl, cellVec) 
 
     ! Array for the contribution of each orbital (and its periodic images)
     if (tReal) then
@@ -413,7 +406,6 @@ contains
       nPoints = shape(valueCmpl)
     end if
 
-!    print*, nPoints, nCell, tReal
     ! Phase factors for the periodic image cell. Note: This will be conjugated in the scalar product
     ! below. This is fine as, in contrast to what was published, DFTB+ uses implicitely exp(-ikr) as
     ! a phase factor, as the unpack routines assemble the lower triangular matrix with exp(ikr) as
@@ -421,8 +413,6 @@ contains
     phases(:,:) = exp((0.0_dp, 1.0_dp) * matmul(transpose(cellVec), kPoints))
 
     ! Loop over all grid points
-
-!!$OMP DO
     lpI3: do i3 = 1, nPoints(3)
       curCoords(:, 3) = real(i3 - 1, dp) * gridVecs(:,3)
       lpI2: do i2 = 1, nPoints(2)
@@ -435,7 +425,11 @@ contains
             xyz(:) = matmul(latVecs, frac - real(floor(frac), dp))
           end if
           ! Get contribution from every atom in every cell for current point
+!$OMP PARALLEL DEFAULT(NONE) &
+!$OMP PRIVATE(iCell, allZero, iAtom, ind, iSpecies, iL, iM, iOrb, diff, val, xx) &
+!$OMP SHARED(stos, nCell, nAtom, species, atomAllOrbVal, xyz, coords, iStos, angMoms, cutoffs)  
           allZero = .true.
+!$OMP DO
           lpCell: do iCell = 1, nCell
             ind = 1
             lpAtom: do iAtom = 1, nAtom
@@ -459,6 +453,8 @@ contains
               end do lpOrb
             end do lpAtom
           end do lpCell
+!$OMP END DO
+!$OMP END PARALLEL
 
           if (allZero) then
             if (tReal) then
@@ -515,8 +511,6 @@ contains
         end do lpI1
       end do lpI2
     end do lpI3
-!!$OMP END DO
-!!$OMP END PARALLEL
 
   end subroutine local_getValue
 
