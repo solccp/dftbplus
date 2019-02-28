@@ -143,6 +143,9 @@ module InitWaveplot
   !> Nr of grid points along 3 directions
   integer, public :: nPoints(3)
 
+  !> Automatic determination of grid points
+  logical, public :: tAutoGrids
+
   !> If grid should shifted by a half cell
   logical :: tShiftGrid
 
@@ -211,6 +214,7 @@ contains
     integer :: inputVersion
     integer :: ii
     logical :: tHSD, tGroundState
+    real(dp) :: als
 
     !! Write header
     write(stdout, "(A)") repeat("=", 80)
@@ -269,6 +273,13 @@ contains
     write(stdout, *)
     call destroyNode(input)
 
+    if (tAutoGrids) then
+      write(stdout, "(A)") "Determining the number of grid points..."
+      do ii = 1, 3
+        nPoints(ii) = 5.0_dp * sqrt(dot_product(boxVecs(:,ii), boxVecs(:,ii)))
+      end do
+    end if
+
     !! Create grid vectors, shift them if necessary
     do ii = 1, 3
       gridVec(:,ii) = boxVecs(:,ii) / real(nPoints(ii), dp)
@@ -279,6 +290,9 @@ contains
       gridOrigin(:) = origin(:)
     end if
     gridVol = determinant(gridVec)
+
+    
+
 
     write(stdout, "(A)") "Doing initialisation"
 
@@ -586,6 +600,9 @@ contains
     if (any(nPoints <= 0)) then
       call detailedError(field, "Specified numbers must be greater than zero")
     end if
+
+    call getChildValue(node, "AutoGrids", tAutoGrids, .false.)
+
     call getChildValue(node, "ShiftGrid", tShiftGrid, default=.true.)
     if (tPeriodic) then
       call getChildValue(node, "FoldAtomsToUnitCell", tFoldCoords, &

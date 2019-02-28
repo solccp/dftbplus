@@ -97,6 +97,8 @@ program waveplot
     end do
   end if
 
+  write(stdout, "(A)") "Grids"
+  write(stdout, "(2X,3(i5,1X))") nPoints(1:3)
   write(stdout, "(A)") "Origin"
   write(stdout, "(2X,3(F0.5,1X))") origin(:)
   write(stdout, "(A)") "Box"
