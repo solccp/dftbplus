@@ -121,7 +121,7 @@ module dftbp_taggedoutput
     character(lenLabel) :: stressKE   = 'kinetic_stress'
 
     ! > Vibrational frequencies
-    ! character(lenLabel), parameter, public :: tag_frequencies   = 'frequencies'
+    character(lenLabel) :: frequencies   = 'frequencies'
 
 
   ! general format strings

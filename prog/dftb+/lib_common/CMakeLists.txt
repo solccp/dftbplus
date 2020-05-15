@@ -14,7 +14,9 @@ set(sources-fpp
   ${curdir}/schedule.F90
   ${curdir}/timer.F90
   ${curdir}/timerarray.F90
-  ${curdir}/unitconversion.F90)
+  ${curdir}/unitconversion.F90
+  ${curdir}/atomicnumbers.F90
+  )
 
 if(WITH_MPI)
   list(APPEND sources-fpp

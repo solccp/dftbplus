@@ -1,5 +1,5 @@
 module atomicnumbers
-  use accuracy
+  use dftbp_accuracy
   
   public
   type atomicnumberpair
