@@ -1,6 +1,6 @@
 !--------------------------------------------------------------------------------------------------!
 !  DFTB+: general package for performing fast atomistic simulations                                !
-!  Copyright (C) 2018  DFTB+ developers group                                                      !
+!  Copyright (C) 2006 - 2020  DFTB+ developers group                                               !
 !                                                                                                  !
 !  See the LICENSE file for terms of usage and distribution.                                       !
 !--------------------------------------------------------------------------------------------------!
@@ -10,23 +10,23 @@
 !> Contains subroutines for packing/unpacking Hamiltonian-like matrices between the square and
 !> 1-dimensional representations
 !>
-module sparse2dense
-  use assert
-  use accuracy
-  use constants, only : pi, imag
-  use commontypes
-  use memman
-  use periodic, only : TNeighbourList
-  use densedescr
+module dftbp_sparse2dense
+  use dftbp_assert
+  use dftbp_accuracy
+  use dftbp_constants, only : pi, imag
+  use dftbp_commontypes
+  use dftbp_memman
+  use dftbp_periodic, only : TNeighbourList
+  use dftbp_densedescr
 #:if WITH_SCALAPACK
-  use scalapackfx
-  use blacsenv
+  use dftbp_scalapackfx
+  use dftbp_blacsenv
 #:endif
   implicit none
   private
 
   public :: unpackHS, packHS, iPackHS, packErho
-  public :: blockSymmetrizeHS, blockHermitianHS, blockAntiSymmetrizeHS
+  public :: blockSymmetrizeHS, blockHermitianHS, blockAntiSymmetrizeHS, symmetrizeHS
   public :: packHSPauli, packHSPauliImag, unpackHPauli, unpackSPauli
 
 #:if WITH_SCALAPACK
@@ -83,6 +83,12 @@ module sparse2dense
   interface blockAntiSymmetrizeHS
     module procedure blockAntiSymmetrizeHS_real
   end interface blockAntiSymmetrizeHS
+
+
+  !> Symmetrize the square matrix including the on-site blocks
+  interface symmetrizeHS
+    module procedure symmetrizeHS_real
+  end interface symmetrizeHS
 
 contains
 
@@ -1423,6 +1429,21 @@ contains
   end subroutine blockAntiSymmetrizeHS_real
 
 
+  !> Copy lower triangle to upper for a square matrix. (Real version)
+  subroutine symmetrizeHS_real(matrix)
+
+    !> matrix to symmetrize
+    real(dp), intent(inout) :: matrix(:,:)
+    integer :: ii, matSize
+
+    matSize = size(matrix, dim = 1)
+    do ii = 1, matSize - 1
+      matrix(ii, ii + 1 : matSize) = matrix(ii + 1 : matSize, ii)
+    end do
+
+  end subroutine symmetrizeHS_real
+
+
 #:if WITH_SCALAPACK
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!! Scalapack routines
@@ -2370,4 +2391,4 @@ contains
 
 #:endif
 
-end module sparse2dense
+end module dftbp_sparse2dense

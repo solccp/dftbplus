@@ -1,6 +1,6 @@
 !--------------------------------------------------------------------------------------------------!
 !  DFTB+: general package for performing fast atomistic simulations                                !
-!  Copyright (C) 2018  DFTB+ developers group                                                      !
+!  Copyright (C) 2006 - 2020  DFTB+ developers group                                               !
 !                                                                                                  !
 !  See the LICENSE file for terms of usage and distribution.                                       !
 !--------------------------------------------------------------------------------------------------!
@@ -8,14 +8,14 @@
 #:include 'common.fypp'
 
 !> Implements a repulsive potential between two atoms represented by cubic splines.
-module repspline
-  use assert
-  use Accuracy
-  use Bisect
+module dftbp_repspline
+  use dftbp_assert
+  use dftbp_accuracy
+  use dftbp_bisect
   implicit none
   private
 
-  public :: TRepSplineIn, ORepSpline, init
+  public :: TRepSplineIn, TRepSpline, init
   public :: getCutoff, getEnergy, getEnergyDeriv
 
 
@@ -43,7 +43,7 @@ module repspline
 
 
   !> Contains the spline representation of a repulsive.
-  type ORepSpline
+  type TRepSpline
     private
 
     !> Nr. of splines.
@@ -69,7 +69,7 @@ module repspline
 
     !> Order of the spline
     integer :: nOrder = 3               
-  end type ORepSpline
+  end type TRepSpline
 
 
   !> Initialises spline repulsive.
@@ -102,7 +102,7 @@ contains
   subroutine RepSpline_init(self, inp)
 
     !> Spline repulsive.
-    type(ORepSpline), intent(out) :: self
+    type(TRepSpline), intent(out) :: self
 
     !> Input parameters for the spline repulsive.
     type(TRepSplineIn), intent(in) :: inp
@@ -131,7 +131,7 @@ contains
   function RepSpline_getCutoff(self) result(cutoff)
 
     !> Spline repulsive.
-    type(ORepSpline), intent(in) :: self
+    type(TRepSpline), intent(in) :: self
 
     !> Cutoff.
     real(dp) :: cutoff
@@ -145,7 +145,7 @@ contains
   subroutine RepSpline_getEnergy(self, res, rr)
 
     !> Spline repulsive.
-    type(ORepSpline), intent(in) :: self
+    type(TRepSpline), intent(in) :: self
 
     !> repulsive contribution
     real(dp), intent(out) :: res
@@ -210,7 +210,7 @@ contains
   subroutine RepSpline_getEnergyDeriv(self, grad, xx, d2)
 
     !> Spline repulsive.
-    type(ORepSpline), intent(in) :: self
+    type(TRepSpline), intent(in) :: self
 
     !> Resulting contribution
     real(dp), intent(out) :: grad(3)
@@ -310,4 +310,4 @@ contains
 
   end subroutine RepSpline_getEnergyDeriv
 
-end module repspline
+end module dftbp_repspline

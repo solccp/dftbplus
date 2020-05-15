@@ -1,6 +1,6 @@
 !--------------------------------------------------------------------------------------------------!
 !  DFTB+: general package for performing fast atomistic simulations                                !
-!  Copyright (C) 2018  DFTB+ developers group                                                      !
+!  Copyright (C) 2006 - 2020  DFTB+ developers group                                               !
 !                                                                                                  !
 !  See the LICENSE file for terms of usage and distribution.                                       !
 !--------------------------------------------------------------------------------------------------!
@@ -8,15 +8,15 @@
 #:include 'common.fypp'
 
 !> Contains subroutines for formatted output of data
-module formatout
-  use globalenv
-  use environment
-  use message
-  use assert
-  use accuracy
-  use constants
-  use lapackroutines, only: matinv
-  use sparse2dense
+module dftbp_formatout
+  use dftbp_globalenv
+  use dftbp_environment
+  use dftbp_assert
+  use dftbp_accuracy
+  use dftbp_message
+  use dftbp_constants
+  use dftbp_lapackroutines, only: matinv
+  use dftbp_sparse2dense
   implicit none
   private
 
@@ -69,7 +69,7 @@ contains
 
 
   !> A wrapper around writeGenFormat_fid to open a file first.
-  subroutine writeGenFormat_fname(fileName, coord, species, speciesName, latVec, tFracCoord)
+  subroutine writeGenFormat_fname(fileName, coord, species, speciesName, latVec, tFracCoord, append)
 
     !> File name of the file which should be created
     character(len=*), intent(in) :: fileName
@@ -89,11 +89,27 @@ contains
     !> Print out fractional coordinates?
     logical, intent(in), optional :: tFracCoord
 
+    !> Whether geometry should be appended (default: it is overwritten)
+    logical, intent(in), optional :: append
+
     integer :: fd
+
+    logical :: append0
+
+    if (present(append)) then
+      append0 = append
+    else
+      append0 = .false.
+    end if
 
     @:ASSERT((.not.(present(tFracCoord).neqv.present(latVec))) .or.(present(latVec)))
 
-    open(newunit=fd, file=fileName, form="formatted", action="write", status="replace")
+    if (append0) then
+      open(newunit=fd, file=fileName, form="formatted", action="write", status="old",&
+          & position="append")
+    else
+      open(newunit=fd, file=fileName, form="formatted", action="write", status="replace")
+    end if
     call writeGenFormat(fd, coord, species, speciesName, latVec, tFracCoord)
     close(fd)
 
@@ -320,16 +336,19 @@ contains
     write(stdOut, '(3A)') verticalBar, '  DFTB+ paramerization version by Chien-Pin Chou: ', '20180919'
     write(stdOut, '(3A)') verticalBar, '  DFTB+ ', trim(release)
     write(stdOut, '(A)') verticalBar
-    write(stdOut, '(2A,I0,A)') verticalBar, '  Copyright (C) ', year, '  DFTB+ developers group'
+    write(stdOut, '(2A,I0,A)') verticalBar, '  Copyright (C) 2006 - ', year,&
+        & '  DFTB+ developers group'
     write(stdOut, '(A,/,2A,/,A)') verticalBar, verticalBar, repeat(horizontalBar, headerWidth - 1),&
         & verticalBar
     write(stdOut, '(2A)') verticalBar,&
         & '  When publishing results obtained with DFTB+, please cite the following', verticalBar,&
         & '  reference:'
     write(stdOut, '(A)') verticalBar
-    write(stdOut, '(2A)') verticalBar,'  * B. Aradi, B. Hourahine and T. Frauenheim,', verticalBar,&
-        & '    DFTB+, a Sparse Matrix-Based Implementation of the DFTB Method,', verticalBar,&
-        & '    J. Phys. Chem. A, 111 5678 (2007).  [doi: 10.1021/jp070186p]'
+    write(stdOut, '(2A)') verticalBar,&
+        & '  * DFTB+, a software package for efficient approximate density functional',&
+        & verticalBar,&
+        & '    theory based atomistic simulations, J. Chem. Phys. 152, 124101 (2020).',&
+        & verticalBar, '    [doi: 10.1063/1.5143190]'
     write(stdOut, '(A)') verticalBar
     write(stdOut, '(2A,2(/,2A))') verticalBar,&
         & '  You should also cite additional publications crediting the parametrization',&
@@ -535,4 +554,4 @@ contains
 
   end subroutine writeSparse
 
-end module formatout
+end module dftbp_formatout
